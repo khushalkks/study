@@ -124,6 +124,12 @@ const Dashboard = () => {
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        html, body, #root {
+          width: 100%;
+          height: 100%;
+          overflow-x: hidden;
+        }
+
         :root {
           --void: #06030f;
           --deep: #0d0720;
@@ -143,6 +149,7 @@ const Dashboard = () => {
           font-family: 'DM Sans', sans-serif;
           background: var(--void);
           min-height: 100vh;
+          width: 100%;
           color: var(--pale);
           overflow-x: hidden;
           position: relative;
@@ -176,6 +183,7 @@ const Dashboard = () => {
           background: rgba(6,3,15,0.8);
           backdrop-filter: blur(24px);
           border-bottom: 1px solid rgba(124,58,237,0.12);
+          width: 100%;
         }
 
         .db-logo {
@@ -233,12 +241,17 @@ const Dashboard = () => {
         }
         .db-nav-back:hover { background: rgba(45,22,114,0.4); border-color: rgba(168,85,247,0.6); }
 
+        /* Content wrapper — full width, padded inside */
+        .db-content {
+          width: 100%;
+          padding: 0 48px;
+        }
+
         /* Header */
         .db-header {
           position: relative; z-index: 2;
-          padding: 60px 48px 40px;
-          max-width: 1280px;
-          margin: 0 auto;
+          padding: 60px 0 40px;
+          width: 100%;
           opacity: 0;
           transform: translateY(20px);
           transition: all 0.6s cubic-bezier(0.16,1,0.3,1);
@@ -282,9 +295,8 @@ const Dashboard = () => {
         /* Stats bar */
         .db-statsbar {
           position: relative; z-index: 2;
-          max-width: 1280px;
-          margin: 0 auto 48px;
-          padding: 0 48px;
+          width: 100%;
+          margin-bottom: 48px;
           display: flex; gap: 24px; flex-wrap: wrap;
           opacity: 0; transform: translateY(16px);
           transition: all 0.6s cubic-bezier(0.16,1,0.3,1) 0.1s;
@@ -319,19 +331,22 @@ const Dashboard = () => {
           color: rgba(233,213,255,0.35);
         }
 
-        /* Grid */
+        /* Grid — full width, no max-width constraint */
         .db-grid {
           position: relative; z-index: 2;
-          max-width: 1280px;
-          margin: 0 auto;
-          padding: 0 48px 80px;
+          width: 100%;
+          padding-bottom: 80px;
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 20px;
         }
 
         @media (max-width: 1100px) { .db-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 640px) { .db-grid { grid-template-columns: 1fr; padding: 0 20px 60px; } .db-header,.db-statsbar { padding: 40px 20px 20px; } .db-nav { padding: 16px 20px; } }
+        @media (max-width: 640px) {
+          .db-grid { grid-template-columns: 1fr; }
+          .db-content { padding: 0 20px; }
+          .db-nav { padding: 16px 20px; }
+        }
 
         /* Feature card */
         .feat-card {
@@ -516,122 +531,125 @@ const Dashboard = () => {
           </div>
         </nav>
 
-        {/* Header */}
-        <div className={`db-header ${loaded ? "in" : ""}`}>
-          <div className="db-eyebrow">✦ your workspace</div>
-          <h1 className="db-title">
-            Choose your<br />
-            <span>AI feature</span>
-          </h1>
-          <p className="db-subtitle">
-            Six intelligent tools built around your document. Pick one to get started — each unlocks a different way to learn.
-          </p>
-        </div>
+        {/* All content in single full-width padded wrapper */}
+        <div className="db-content">
+          {/* Header */}
+          <div className={`db-header ${loaded ? "in" : ""}`}>
+            <div className="db-eyebrow">✦ your workspace</div>
+            <h1 className="db-title">
+              Choose your<br />
+              <span>AI feature</span>
+            </h1>
+            <p className="db-subtitle">
+              Six intelligent tools built around your document. Pick one to get started — each unlocks a different way to learn.
+            </p>
+          </div>
 
-        {/* Stats bar */}
-        <div className={`db-statsbar ${loaded ? "in" : ""}`}>
-          {[
-            { val: "6", label: "Features Available" },
-            { val: "100%", label: "Document-Grounded" },
-            { val: "AI", label: "Powered by LLM" },
-          ].map((s, i) => (
-            <div className="db-stat-chip" key={i}>
-              <div className="db-stat-chip-dot" style={{ background: ["#7c3aed","#a855f7","#c084fc"][i], boxShadow: `0 0 8px ${["#7c3aed","#a855f7","#c084fc"][i]}` }} />
-              <span>{s.val}</span>
-              <span>{s.label}</span>
-            </div>
-          ))}
-        </div>
+          {/* Stats bar */}
+          <div className={`db-statsbar ${loaded ? "in" : ""}`}>
+            {[
+              { val: "6", label: "Features Available" },
+              { val: "100%", label: "Document-Grounded" },
+              { val: "AI", label: "Powered by LLM" },
+            ].map((s, i) => (
+              <div className="db-stat-chip" key={i}>
+                <div className="db-stat-chip-dot" style={{ background: ["#7c3aed","#a855f7","#c084fc"][i], boxShadow: `0 0 8px ${["#7c3aed","#a855f7","#c084fc"][i]}` }} />
+                <span>{s.val}</span>
+                <span>{s.label}</span>
+              </div>
+            ))}
+          </div>
 
-        {/* Feature Grid */}
-        <div className="db-grid">
-          {features.map((f, i) => (
-            <div
-              key={f.id}
-              className={`feat-card ${loaded ? "in" : ""}`}
-              style={{
-                transitionDelay: loaded ? `${0.15 + i * 0.07}s` : "0s",
-              }}
-              onMouseEnter={() => setHovered(f.id)}
-              onMouseLeave={() => setHovered(null)}
-              onClick={() => navigate(f.route)}
-            >
-              {/* Glow spot */}
+          {/* Feature Grid */}
+          <div className="db-grid">
+            {features.map((f, i) => (
               <div
-                className="feat-card-glow"
-                style={{ background: `radial-gradient(circle, ${f.glow}, transparent 70%)` }}
-              />
-              {/* BG tint */}
-              <div
-                className="feat-card-bg"
-                style={{ "--card-color-faint": f.glow.replace("0.35","0.08") }}
-              />
-              {/* Top shimmer */}
-              <style>{`.feat-card:nth-child(${i+1})::after { background: linear-gradient(90deg, transparent, ${f.color}, transparent); }`}</style>
-
-              <div className="feat-top">
-                {/* Icon */}
+                key={f.id}
+                className={`feat-card ${loaded ? "in" : ""}`}
+                style={{
+                  transitionDelay: loaded ? `${0.15 + i * 0.07}s` : "0s",
+                }}
+                onMouseEnter={() => setHovered(f.id)}
+                onMouseLeave={() => setHovered(null)}
+                onClick={() => navigate(f.route)}
+              >
+                {/* Glow spot */}
                 <div
-                  className="feat-icon-wrap"
+                  className="feat-card-glow"
+                  style={{ background: `radial-gradient(circle, ${f.glow}, transparent 70%)` }}
+                />
+                {/* BG tint */}
+                <div
+                  className="feat-card-bg"
+                  style={{ "--card-color-faint": f.glow.replace("0.35","0.08") }}
+                />
+                {/* Top shimmer */}
+                <style>{`.feat-card:nth-child(${i+1})::after { background: linear-gradient(90deg, transparent, ${f.color}, transparent); }`}</style>
+
+                <div className="feat-top">
+                  {/* Icon */}
+                  <div
+                    className="feat-icon-wrap"
+                    style={{
+                      background: hovered === f.id
+                        ? `linear-gradient(135deg, ${f.color}, ${f.color}bb)`
+                        : `rgba(${hexToRgb(f.color)}, 0.15)`,
+                      border: `1px solid ${hovered === f.id ? "transparent" : `${f.color}44`}`,
+                      boxShadow: hovered === f.id ? `0 0 24px ${f.glow}` : "none",
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24" fill="none" stroke={hovered === f.id ? "white" : f.color}
+                      strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
+                      style={{ width: 22, height: 22 }}
+                    >
+                      {f.icon.props.children}
+                    </svg>
+                  </div>
+
+                  {/* Badge */}
+                  <span
+                    className="feat-badge"
+                    style={{
+                      color: f.color,
+                      borderColor: `${f.color}44`,
+                      background: `${f.color}14`,
+                    }}
+                  >
+                    {f.badge}
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div className="feat-divider" style={{ background: f.color }} />
+
+                <h3 className="feat-title">{f.title}</h3>
+                <p className="feat-tagline" style={{ color: `${f.color}cc` }}>{f.tagline}</p>
+                <p className="feat-desc">{f.desc}</p>
+
+                {/* CTA */}
+                <button
+                  className="feat-btn"
                   style={{
                     background: hovered === f.id
                       ? `linear-gradient(135deg, ${f.color}, ${f.color}bb)`
-                      : `rgba(${hexToRgb(f.color)}, 0.15)`,
-                    border: `1px solid ${hovered === f.id ? "transparent" : `${f.color}44`}`,
-                    boxShadow: hovered === f.id ? `0 0 24px ${f.glow}` : "none",
+                      : `${f.color}1a`,
+                    color: hovered === f.id ? "white" : f.color,
+                    boxShadow: hovered === f.id ? `0 4px 20px ${f.glow}` : "none",
                   }}
+                  onClick={(e) => { e.stopPropagation(); navigate(f.route); }}
                 >
-                  <svg
-                    viewBox="0 0 24 24" fill="none" stroke={hovered === f.id ? "white" : f.color}
-                    strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round"
-                    style={{ width: 22, height: 22 }}
-                  >
-                    {f.icon.props.children}
+                  Open {f.title}
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+                    <path d="M3 8h10M9 4l4 4-4 4"/>
                   </svg>
-                </div>
+                </button>
 
-                {/* Badge */}
-                <span
-                  className="feat-badge"
-                  style={{
-                    color: f.color,
-                    borderColor: `${f.color}44`,
-                    background: `${f.color}14`,
-                  }}
-                >
-                  {f.badge}
-                </span>
+                {/* Ghost number */}
+                <div className="feat-num">{f.num}</div>
               </div>
-
-              {/* Divider */}
-              <div className="feat-divider" style={{ background: f.color }} />
-
-              <h3 className="feat-title">{f.title}</h3>
-              <p className="feat-tagline" style={{ color: `${f.color}cc` }}>{f.tagline}</p>
-              <p className="feat-desc">{f.desc}</p>
-
-              {/* CTA */}
-              <button
-                className="feat-btn"
-                style={{
-                  background: hovered === f.id
-                    ? `linear-gradient(135deg, ${f.color}, ${f.color}bb)`
-                    : `${f.color}1a`,
-                  color: hovered === f.id ? "white" : f.color,
-                  boxShadow: hovered === f.id ? `0 4px 20px ${f.glow}` : "none",
-                }}
-                onClick={(e) => { e.stopPropagation(); navigate(f.route); }}
-              >
-                Open {f.title}
-                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-                  <path d="M3 8h10M9 4l4 4-4 4"/>
-                </svg>
-              </button>
-
-              {/* Ghost number */}
-              <div className="feat-num">{f.num}</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </>

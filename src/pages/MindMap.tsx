@@ -1,590 +1,625 @@
-import React, { useState, useEffect, useRef } from "react";
-import mermaid from "mermaid";
-import { useNavigate } from "react-router-dom";
 
-const MindmapPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [topic, setTopic] = useState("");
-  const [mindmapCode, setMindmapCode] = useState("");
+import { useState, useCallback, useRef, useEffect } from "react";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type Step = 1 | 2 | 3;
+type ToastType = "success" | "error" | "info";
+
+interface Toast {
+  msg: string;
+  type: ToastType;
+}
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+// ✅ FastAPI default port (Flask waala 5000 nahi!)
+const API = "http://localhost:8000";
+const ACCEPTED = [".pdf", ".docx", ".txt"];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatBytes(bytes: number): string {
+  return bytes < 1024 * 1024
+    ? `${(bytes / 1024).toFixed(1)} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function GridBg() {
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        backgroundImage:
+          "linear-gradient(rgba(56,189,248,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,0.04) 1px, transparent 1px)",
+        backgroundSize: "52px 52px",
+        pointerEvents: "none",
+        zIndex: 0,
+      }}
+    />
+  );
+}
+
+function StepTracker({ step }: { step: Step }) {
+  const steps = ["Upload", "Keywords", "Mindmap"];
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 44 }}>
+      {steps.map((label, i) => {
+        const num = (i + 1) as Step;
+        const isDone = num < step;
+        const isActive = num === step;
+        return (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  border: `2px solid ${isDone ? "#34d399" : isActive ? "#38bdf8" : "#2a2a3d"}`,
+                  background: isDone ? "#34d399" : isActive ? "#38bdf8" : "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 11,
+                  fontFamily: "'Space Mono', monospace",
+                  color: isDone || isActive ? "#0a0a0f" : "#6b6b85",
+                  transition: "all 0.35s",
+                  fontWeight: 700,
+                }}
+              >
+                {isDone ? "✓" : num}
+              </div>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontFamily: "'Space Mono', monospace",
+                  color: isDone ? "#34d399" : isActive ? "#38bdf8" : "#6b6b85",
+                  transition: "color 0.35s",
+                }}
+              >
+                {label}
+              </span>
+            </div>
+            {i < 2 && (
+              <div
+                style={{
+                  width: 48,
+                  height: 1,
+                  background: isDone ? "#34d399" : "#2a2a3d",
+                  margin: "0 10px",
+                  transition: "background 0.4s",
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div
+      style={{
+        background: "#13131e",
+        border: "1px solid #1e1e2e",
+        borderRadius: 20,
+        padding: 32,
+        marginBottom: 20,
+        position: "relative",
+        overflow: "hidden",
+        animation: "fadeUp 0.4s ease forwards",
+        ...style,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 0, left: "15%", right: "15%",
+          height: 1,
+          background: "linear-gradient(90deg, transparent, #38bdf840, transparent)",
+        }}
+      />
+      {children}
+    </div>
+  );
+}
+
+function CardLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        fontSize: 10,
+        fontFamily: "'Space Mono', monospace",
+        letterSpacing: 4,
+        textTransform: "uppercase" as const,
+        color: "#38bdf8",
+        marginBottom: 18,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 16, padding: 40 }}>
+      <div
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: "50%",
+          border: "3px solid #1e1e2e",
+          borderTopColor: "#38bdf8",
+          animation: "spin 0.75s linear infinite",
+        }}
+      />
+      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85" }}>
+        Thinking with Ollama…
+      </span>
+    </div>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+export default function MindMapGenerator() {
+  const [step, setStep] = useState<Step>(1);
+  const [file, setFile] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string>("");
+  const [customTopic, setCustomTopic] = useState("");
+  const [mermaidCode, setMermaidCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [generated, setGenerated] = useState(false);
+  const [toast, setToast] = useState<Toast | null>(null);
+  const [mermaidSvg, setMermaidSvg] = useState("");
   const mermaidRef = useRef<HTMLDivElement>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load mermaid dynamically
   useEffect(() => {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: "dark",
-      themeVariables: {
-        darkMode: true,
-        background: "#06030f",
-        primaryColor: "#3b0764",
-        primaryTextColor: "#f0abfc",
-        primaryBorderColor: "#a855f7",
-        lineColor: "#7c3aed",
-        secondaryColor: "#1e1b4b",
-        tertiaryColor: "#0f172a",
-        edgeLabelBackground: "#1e0f45",
-        clusterBkg: "#130a2e",
-        titleColor: "#e9d5ff",
-        nodeTextColor: "#e9d5ff",
-        mainBkg: "#06030f",
-        nodeBorder: "#7c3aed",
-        clusterBorder: "#5b21b6",
-        defaultLinkColor: "#7c3aed",
-        fontFamily: "'Syne', sans-serif",
-        fontSize: "16px",
-      },
-      mindmap: {
-        padding: 20,
-        maxNodeWidth: 200,
-      },
-    });
-  }, []);
+    if (mermaidCode) renderMermaid(mermaidCode);
+  }, [mermaidCode]);
 
-  useEffect(() => {
-    if (mindmapCode && mermaidRef.current) {
-      mermaidRef.current.innerHTML = mindmapCode;
-      mermaidRef.current.removeAttribute("data-processed");
-      mermaid.run({ nodes: [mermaidRef.current] })
-        .then(() => {
-          const svg = mermaidRef.current?.querySelector("svg");
-          if (!svg) return;
-          // Force dark fill on ALL rect/polygon — Mermaid injects white inline styles
-          svg.querySelectorAll("rect").forEach((el) => {
-            el.style.fill = "#130a2e";
-            el.style.stroke = "#7c3aed";
-            el.style.strokeWidth = "1.5px";
-          });
-          svg.querySelectorAll("polygon").forEach((el) => {
-            el.style.fill = "#1e0f45";
-            el.style.stroke = "#a855f7";
-          });
-          // Circles — root gets brighter purple
-          svg.querySelectorAll("circle").forEach((el, i) => {
-            el.style.fill = i === 0 ? "#3b0764" : "#2d1672";
-            el.style.stroke = i === 0 ? "#c084fc" : "#7c3aed";
-          });
-          // All text — dark/black
-          svg.querySelectorAll("text, tspan").forEach((el) => {
-            (el as SVGElement).style.fill = "#0a0010";
-            (el as SVGElement).style.fontFamily = "'Syne', sans-serif";
-            (el as SVGElement).style.fontWeight = "800";
-          });
-        })
-        .catch(console.error);
-    }
-  }, [mindmapCode]);
-
-  const generateMindmap = async () => {
-    if (!topic.trim()) { setError("Topic daalo pehle!"); return; }
-    setLoading(true); setError(""); setMindmapCode(""); setGenerated(false);
+  async function renderMermaid(code: string) {
     try {
-      const response = await fetch("http://localhost:8000/mindmap", {
+      const m = await import("https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs" as string) as any;
+      m.default.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
+      const id = "mm-" + Date.now();
+      const { svg } = await m.default.render(id, code);
+      setMermaidSvg(svg);
+    } catch {
+      setMermaidSvg(`<p style="color:#f87171;font-family:monospace;font-size:13px">Could not render diagram.</p>`);
+    }
+  }
+
+  function showToast(msg: string, type: ToastType = "info") {
+    setToast({ msg, type });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
+  }
+
+  function validateFile(f: File): boolean {
+    const ext = "." + f.name.split(".").pop()!.toLowerCase();
+    if (!ACCEPTED.includes(ext)) {
+      showToast(`Unsupported type: ${ext}. Use PDF, DOCX, or TXT.`, "error");
+      return false;
+    }
+    return true;
+  }
+
+  function handleFileDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const f = e.dataTransfer.files[0];
+    if (f && validateFile(f)) setFile(f);
+  }
+
+  function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f && validateFile(f)) setFile(f);
+  }
+
+  async function extractKeywords() {
+    if (!file) return;
+    setLoading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      // ✅ Correct FastAPI endpoint
+      const res = await fetch(`${API}/mindmap/upload`, { method: "POST", body: form });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+      // ✅ Backend returns: { filename, keywords, primary_topic, mermaid, tree }
+      if (!data.keywords?.length) throw new Error("No keywords found in document");
+
+      setKeywords(data.keywords);
+      setStep(2);
+      showToast(`${data.keywords.length} keywords extracted!`, "success");
+    } catch (e: any) {
+      showToast("Extract failed: " + e.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function generateMindmap() {
+    const topic = selected || customTopic.trim();
+    if (!topic) return;
+    setStep(3);
+    setLoading(true);
+    setMermaidSvg("");
+    try {
+      // ✅ Correct FastAPI endpoint — matches MindmapTopicRequest(topic: str)
+      const res = await fetch(`${API}/mindmap/topic`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || "Failed to generate mindmap");
-      setMindmapCode(data.mindmap);
-      setGenerated(true);
-    } catch (err: any) {
-      setError(err.message);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `Server error ${res.status}`);
+      }
+
+      const data = await res.json();
+      // ✅ Backend returns: { topic, mermaid, tree }
+      if (!data.mermaid) throw new Error("No mindmap returned from server");
+      setMermaidCode(data.mermaid);
+    } catch (e: any) {
+      showToast("Mindmap failed: " + e.message, "error");
+      setMermaidSvg(`<p style="color:#f87171">Error: ${e.message}</p>`);
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") generateMindmap();
-  };
+  function restart() {
+    setStep(1);
+    setFile(null);
+    setKeywords([]);
+    setSelected("");
+    setCustomTopic("");
+    setMermaidCode("");
+    setMermaidSvg("");
+  }
+
+  function downloadSVG() {
+    if (!mermaidSvg) return;
+    const blob = new Blob([mermaidSvg], { type: "image/svg+xml" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `mindmap-${selected || customTopic || "output"}.svg`;
+    a.click();
+  }
+
+  const activeTopic = selected || customTopic.trim();
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root {
-          --void: #06030f; --deep: #0d0720; --ink: #130a2e; --mid: #1e0f45;
-          --rich: #2d1672; --vivid: #7c3aed; --bright: #a855f7;
-          --glow: #c084fc; --pale: #e9d5ff; --mist: #f5f3ff; --accent: #f0abfc;
-        }
-        body { background: var(--void); overflow-x: hidden; }
-        @keyframes pdot { 0%,100%{transform:scale(1);}50%{transform:scale(1.5);opacity:0.6;} }
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600&display=swap');
+        @keyframes fadeUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes fadeup { from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);} }
-        @keyframes pulse-ring { 0%{transform:scale(0.95);opacity:0.8;}50%{transform:scale(1.05);opacity:0.4;}100%{transform:scale(0.95);opacity:0.8;} }
-        @keyframes float { 0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);} }
-
-        /* ── Mermaid deep overrides ── */
-        .mm-root .mermaid svg {
-          background: transparent !important;
-          width: 100% !important;
-          height: 100% !important;
-          min-height: 500px;
-        }
-
-        /* ALL rectangle / polygon node shapes — force dark fill */
-        .mm-root .mermaid svg rect,
-        .mm-root .mermaid svg polygon,
-        .mm-root .mermaid svg .mindmap-node rect,
-        .mm-root .mermaid svg .mindmap-node polygon,
-        .mm-root .mermaid svg .node rect,
-        .mm-root .mermaid svg .node polygon {
-          fill: #130a2e !important;
-          stroke: #7c3aed !important;
-          stroke-width: 1.5px !important;
-          rx: 10px !important;
-          filter: drop-shadow(0 0 8px rgba(124,58,237,0.5)) !important;
-        }
-
-        /* Circle / ellipse nodes */
-        .mm-root .mermaid svg circle,
-        .mm-root .mermaid svg ellipse,
-        .mm-root .mermaid svg .mindmap-node circle,
-        .mm-root .mermaid svg .mindmap-node ellipse {
-          fill: #2d1672 !important;
-          stroke: #a855f7 !important;
-          stroke-width: 2.5px !important;
-          filter: drop-shadow(0 0 12px rgba(168,85,247,0.7)) !important;
-        }
-
-        /* ALL text inside SVG — force dark/black */
-        .mm-root .mermaid svg text,
-        .mm-root .mermaid svg tspan,
-        .mm-root .mermaid svg .mindmap-node text,
-        .mm-root .mermaid svg .label,
-        .mm-root .mermaid svg .nodeLabel {
-          fill: #0a0010 !important;
-          color: #0a0010 !important;
-          font-family: 'Syne', sans-serif !important;
-          font-weight: 800 !important;
-        }
-
-        /* Root node special */
-        .mm-root .mermaid svg .mindmap-node:first-child circle,
-        .mm-root .mermaid svg .mindmap-node:first-child ellipse {
-          fill: #3b0764 !important;
-          stroke: #c084fc !important;
-          stroke-width: 3px !important;
-          filter: drop-shadow(0 0 20px rgba(192,132,252,0.8)) !important;
-        }
-
-        /* Edges / lines */
-        .mm-root .mermaid svg path,
-        .mm-root .mermaid svg .edge,
-        .mm-root .mermaid svg line {
-          stroke: #7c3aed !important;
-          stroke-width: 1.8px !important;
-          stroke-opacity: 0.7 !important;
-        }
-
-        /* Keep rect fill consistent — override any inline style Mermaid injects */
-        .mm-root .mermaid svg [style*="fill: rgb(255"] rect,
-        .mm-root .mermaid svg [style*="fill: white"] rect,
-        .mm-root .mermaid svg [style*="fill:#fff"] rect {
-          fill: #130a2e !important;
-        }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 4px; }
+        @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0f; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0a0a0f; }
+        ::-webkit-scrollbar-thumb { background: #2a2a3d; border-radius: 99px; }
       `}</style>
 
-      <div className="mm-root" style={{
-        fontFamily: "'DM Sans', sans-serif",
-        background: "var(--void)",
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        color: "var(--pale)",
-        position: "relative",
-        overflow: "hidden",
-      }}>
+      <GridBg />
 
-        {/* BG Orbs */}
-        <div style={{ position:"fixed", width:700, height:700, borderRadius:"50%", background:"radial-gradient(circle,rgba(91,33,182,0.12),transparent 70%)", filter:"blur(100px)", top:-200, right:-200, pointerEvents:"none", zIndex:0 }}/>
-        <div style={{ position:"fixed", width:500, height:500, borderRadius:"50%", background:"radial-gradient(circle,rgba(168,85,247,0.08),transparent 70%)", filter:"blur(100px)", bottom:-100, left:-100, pointerEvents:"none", zIndex:0 }}/>
-        <div style={{ position:"fixed", inset:0, backgroundImage:"linear-gradient(rgba(124,58,237,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,0.022) 1px,transparent 1px)", backgroundSize:"52px 52px", pointerEvents:"none", zIndex:0 }}/>
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 860, margin: "0 auto", padding: "52px 24px 100px", fontFamily: "'DM Sans', sans-serif", color: "#e8e8f2" }}>
 
-        {/* NAV */}
-        <nav style={{
-          display:"flex", alignItems:"center", justifyContent:"space-between",
-          padding:"14px 28px",
-          background:"rgba(6,3,15,0.92)",
-          borderBottom:"1px solid rgba(124,58,237,0.14)",
-          backdropFilter:"blur(20px)",
-          zIndex:20, flexShrink:0, position:"relative",
-        }}>
-          <div onClick={() => navigate("/")} style={{
-            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:"1rem",
-            background:"linear-gradient(135deg,#c084fc,#f0abfc)",
-            WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent",
-            display:"flex", alignItems:"center", gap:8, cursor:"pointer",
-          }}>
-            <div style={{ width:7, height:7, background:"#7c3aed", borderRadius:"50%", boxShadow:"0 0 10px #7c3aed", WebkitTextFillColor:"initial", animation:"pdot 2s ease-in-out infinite", flexShrink:0 }}/>
-            AI-LLM Notebook
+        {/* Header */}
+        <header style={{ textAlign: "center", marginBottom: 56 }}>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 5, textTransform: "uppercase", color: "#38bdf8", marginBottom: 18 }}>
+            ⬡ MindMap AI
           </div>
-          <div style={{ display:"flex", alignItems:"center", gap:10, color:"var(--pale)" }}>
-            <span>🧠</span>
-            <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:"0.95rem" }}>Mind Map</span>
-            <span style={{ fontSize:"0.62rem", fontWeight:600, letterSpacing:"0.12em", textTransform:"uppercase", padding:"3px 10px", borderRadius:100, background:"rgba(124,58,237,0.2)", border:"1px solid rgba(124,58,237,0.3)", color:"#c084fc" }}>
-              Ollama · Mistral
-            </span>
-          </div>
-          <button onClick={() => navigate("/dashboard")} style={{
-            padding:"7px 16px", background:"transparent",
-            border:"1px solid rgba(168,85,247,0.22)", borderRadius:8,
-            color:"rgba(233,213,255,0.55)", fontSize:"0.8rem", cursor:"pointer",
-            fontFamily:"'DM Sans',sans-serif",
-          }}>← Dashboard</button>
-        </nav>
+          <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "clamp(38px,6vw,66px)", fontWeight: 400, lineHeight: 1.08, letterSpacing: "-1px", color: "#f0f0f8" }}>
+            Documents become<br />
+            <em style={{ color: "#38bdf8", fontStyle: "italic" }}>visual knowledge</em>
+          </h1>
+          <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85", marginTop: 14 }}>
+            Upload → Extract Keywords → Generate Mindmap
+          </p>
+        </header>
 
-        {/* MAIN */}
-        <div style={{ flex:1, display:"flex", flexDirection:"column", position:"relative", zIndex:2 }}>
+        <StepTracker step={step} />
 
-          {/* ── INPUT SECTION ── */}
-          <div style={{
-            padding:"36px 40px 28px",
-            borderBottom:"1px solid rgba(91,33,182,0.12)",
-            background:"rgba(13,7,32,0.5)",
-            backdropFilter:"blur(10px)",
-          }}>
-            <div style={{ maxWidth:900, margin:"0 auto" }}>
-              <div style={{ fontSize:"0.68rem", fontWeight:600, letterSpacing:"0.15em", textTransform:"uppercase", color:"rgba(192,132,252,0.45)", marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
-                <span>✦</span> Enter Topic
-                <span style={{ flex:1, height:1, background:"linear-gradient(90deg,rgba(124,58,237,0.2),transparent)" }}/>
-              </div>
+        {/* ── STEP 1: Upload ── */}
+        {step === 1 && (
+          <Card>
+            <CardLabel>Step 01 — Upload Document</CardLabel>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleFileDrop}
+              style={{
+                border: `2px dashed ${dragging ? "#38bdf8" : file ? "#34d399" : "#2a2a3d"}`,
+                borderRadius: 14,
+                padding: "48px 24px",
+                textAlign: "center",
+                cursor: "pointer",
+                transition: "all 0.25s",
+                background: dragging ? "rgba(56,189,248,0.06)" : "transparent",
+                position: "relative",
+              }}
+            >
+              <input
+                type="file"
+                accept=".pdf,.docx,.txt"
+                onChange={handleFileInput}
+                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }}
+              />
+              <div style={{ fontSize: 42, marginBottom: 14 }}>{file ? "✅" : "📄"}</div>
+              {file ? (
+                <>
+                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 16, color: "#34d399" }}>{file.name}</div>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#6b6b85", marginTop: 4 }}>{formatBytes(file.size)}</div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 6 }}>Drop your file here</div>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85" }}>Supports .pdf &nbsp;·&nbsp; .docx &nbsp;·&nbsp; .txt</div>
+                </>
+              )}
+            </div>
 
-              <div style={{ display:"flex", gap:12, alignItems:"center" }}>
-                {/* Input */}
-                <div style={{ flex:1, position:"relative" }}>
-                  <div style={{ position:"absolute", left:16, top:"50%", transform:"translateY(-50%)", fontSize:"1.1rem", pointerEvents:"none" }}>🧠</div>
-                  <input
-                    type="text"
-                    placeholder="e.g. Machine Learning, Quantum Physics, History of Rome…"
-                    value={topic}
-                    onChange={e => setTopic(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    style={{
-                      width:"100%", padding:"14px 18px 14px 46px",
-                      background:"rgba(13,7,32,0.8)",
-                      border:"1px solid rgba(124,58,237,0.28)",
-                      borderRadius:14, color:"var(--pale)",
-                      fontSize:"0.95rem", fontFamily:"'DM Sans',sans-serif",
-                      outline:"none",
-                      boxShadow:"inset 0 0 20px rgba(91,33,182,0.08)",
-                      transition:"all 0.25s",
-                    }}
-                    onFocus={e => { e.target.style.borderColor="rgba(168,85,247,0.55)"; e.target.style.boxShadow="0 0 0 3px rgba(124,58,237,0.12), inset 0 0 20px rgba(91,33,182,0.1)"; }}
-                    onBlur={e => { e.target.style.borderColor="rgba(124,58,237,0.28)"; e.target.style.boxShadow="inset 0 0 20px rgba(91,33,182,0.08)"; }}
-                  />
-                </div>
+            <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+              <button
+                onClick={extractKeywords}
+                disabled={!file || loading}
+                style={{
+                  padding: "13px 28px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: file && !loading ? "linear-gradient(135deg,#38bdf8,#818cf8)" : "#1e1e2e",
+                  color: file && !loading ? "#0a0a0f" : "#6b6b85",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  cursor: file && !loading ? "pointer" : "not-allowed",
+                  transition: "all 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                {loading ? "Extracting…" : "Extract Keywords →"}
+              </button>
+            </div>
+          </Card>
+        )}
 
-                {/* Generate Button */}
+        {/* ── STEP 2: Keywords ── */}
+        {step === 2 && (
+          <Card>
+            <CardLabel>Step 02 — Choose Your Topic</CardLabel>
+            <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85", marginBottom: 18 }}>
+              AI ne ye keywords nikale — ek select karo ya khud type karo:
+            </p>
+
+            {/* Keyword chips */}
+            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 10, marginBottom: 28 }}>
+              {keywords.map((kw) => (
                 <button
-                  onClick={generateMindmap}
-                  disabled={loading || !topic.trim()}
+                  key={kw}
+                  onClick={() => { setSelected(kw); setCustomTopic(""); }}
                   style={{
-                    padding:"14px 28px",
-                    background: loading ? "rgba(124,58,237,0.3)" : "linear-gradient(135deg,#7c3aed,#a855f7)",
-                    border:"none", borderRadius:14,
-                    color:"white",
-                    fontFamily:"'Syne',sans-serif", fontSize:"0.92rem", fontWeight:700,
-                    cursor: loading || !topic.trim() ? "not-allowed" : "pointer",
-                    opacity: !topic.trim() && !loading ? 0.5 : 1,
-                    boxShadow: loading ? "none" : "0 0 28px rgba(124,58,237,0.4)",
-                    display:"flex", alignItems:"center", gap:10,
-                    transition:"all 0.25s", whiteSpace:"nowrap",
+                    padding: "9px 18px",
+                    borderRadius: 100,
+                    border: `1.5px solid ${selected === kw ? "#38bdf8" : "#2a2a3d"}`,
+                    background: selected === kw ? "rgba(56,189,248,0.15)" : "transparent",
+                    color: selected === kw ? "#38bdf8" : "#a0a0b8",
+                    fontFamily: "'Space Mono', monospace",
+                    fontSize: 13,
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    fontWeight: selected === kw ? 700 : 400,
                   }}
                 >
-                  {loading ? (
-                    <>
-                      <div style={{ width:16, height:16, borderRadius:"50%", border:"2px solid rgba(255,255,255,0.2)", borderTopColor:"white", animation:"spin 0.8s linear infinite" }}/>
-                      Generating…
-                    </>
-                  ) : (
-                    <>
-                      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                      </svg>
-                      Generate Map
-                    </>
-                  )}
+                  {kw}
                 </button>
+              ))}
+            </div>
+
+            {/* Divider */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+              <div style={{ flex: 1, height: 1, background: "#1e1e2e" }} />
+              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#6b6b85" }}>ya khud type karo</span>
+              <div style={{ flex: 1, height: 1, background: "#1e1e2e" }} />
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+              <input
+                type="text"
+                value={customTopic}
+                onChange={(e) => { setCustomTopic(e.target.value); setSelected(""); }}
+                placeholder="Koi bhi topic…"
+                style={{
+                  flex: 1,
+                  background: "#0e0e18",
+                  border: "1.5px solid #2a2a3d",
+                  borderRadius: 12,
+                  padding: "12px 18px",
+                  fontFamily: "'Space Mono', monospace",
+                  fontSize: 13,
+                  color: "#e8e8f2",
+                  outline: "none",
+                  transition: "border-color 0.2s",
+                }}
+                onFocus={(e) => (e.target.style.borderColor = "#38bdf8")}
+                onBlur={(e) => (e.target.style.borderColor = "#2a2a3d")}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={generateMindmap}
+                disabled={!activeTopic || loading}
+                style={{
+                  padding: "13px 28px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: activeTopic && !loading ? "linear-gradient(135deg,#38bdf8,#818cf8)" : "#1e1e2e",
+                  color: activeTopic && !loading ? "#0a0a0f" : "#6b6b85",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 600,
+                  fontSize: 15,
+                  cursor: activeTopic && !loading ? "pointer" : "not-allowed",
+                  transition: "all 0.2s",
+                }}
+              >
+                {loading ? "Generating…" : "Generate Mindmap →"}
+              </button>
+              <button
+                onClick={restart}
+                style={{
+                  padding: "13px 20px",
+                  borderRadius: 12,
+                  border: "1.5px solid #2a2a3d",
+                  background: "transparent",
+                  color: "#a0a0b8",
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  transition: "border-color 0.2s",
+                }}
+              >
+                ← Back
+              </button>
+            </div>
+          </Card>
+        )}
+
+        {/* ── STEP 3: Mindmap ── */}
+        {step === 3 && (
+          <Card>
+            <CardLabel>Step 03 — Your Mindmap</CardLabel>
+
+            {/* Topic pill */}
+            {(selected || customTopic) && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: "rgba(56,189,248,0.1)", border: "1px solid #38bdf840",
+                borderRadius: 100, padding: "6px 14px", marginBottom: 20,
+                fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#38bdf8",
+              }}>
+                🧠 {selected || customTopic}
               </div>
+            )}
 
-              {/* Error */}
-              {error && (
-                <div style={{ marginTop:12, padding:"10px 14px", background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.2)", borderRadius:10, color:"#fca5a5", fontSize:"0.82rem", display:"flex", gap:8 }}>
-                  ⚠️ {error}
-                </div>
-              )}
+            {loading && <Spinner />}
 
-              {/* Quick topics */}
-              {!generated && !loading && (
-                <div style={{ marginTop:14, display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-                  <span style={{ fontSize:"0.68rem", color:"rgba(192,132,252,0.35)", letterSpacing:"0.08em", textTransform:"uppercase" }}>Try:</span>
-                  {["Machine Learning","Photosynthesis","World War II","Blockchain","Climate Change","Solar System"].map(t => (
-                    <button key={t} onClick={() => setTopic(t)} style={{
-                      padding:"4px 12px", background:"rgba(45,22,114,0.25)",
-                      border:"1px solid rgba(124,58,237,0.2)", borderRadius:100,
-                      color:"rgba(192,132,252,0.65)", fontSize:"0.72rem", cursor:"pointer",
-                      fontFamily:"'DM Sans',sans-serif", transition:"all 0.2s",
-                    }}
-                    onMouseEnter={e => { (e.target as HTMLElement).style.background="rgba(45,22,114,0.5)"; (e.target as HTMLElement).style.color="#c084fc"; }}
-                    onMouseLeave={e => { (e.target as HTMLElement).style.background="rgba(45,22,114,0.25)"; (e.target as HTMLElement).style.color="rgba(192,132,252,0.65)"; }}
-                    >{t}</button>
-                  ))}
-                </div>
+            {/* Mermaid output */}
+            {mermaidSvg && (
+              <div
+                ref={mermaidRef}
+                style={{
+                  background: "#fff",
+                  borderRadius: 14,
+                  padding: 24,
+                  overflow: "auto",
+                  minHeight: 300,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  animation: "fadeUp 0.5s ease forwards",
+                }}
+                dangerouslySetInnerHTML={{ __html: mermaidSvg }}
+              />
+            )}
+
+            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+              <button
+                onClick={restart}
+                style={{
+                  padding: "13px 20px", borderRadius: 12,
+                  border: "1.5px solid #2a2a3d", background: "transparent",
+                  color: "#a0a0b8", fontFamily: "'DM Sans', sans-serif",
+                  fontSize: 14, cursor: "pointer",
+                }}
+              >
+                ← Start Over
+              </button>
+              {mermaidSvg && (
+                <button
+                  onClick={downloadSVG}
+                  style={{
+                    padding: "13px 22px", borderRadius: 12,
+                    border: "1.5px solid #38bdf860", background: "rgba(56,189,248,0.08)",
+                    color: "#38bdf8", fontFamily: "'DM Sans', sans-serif",
+                    fontWeight: 600, fontSize: 14, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  ⬇ Download SVG
+                </button>
               )}
+              <button
+                onClick={() => { setStep(2); setMermaidSvg(""); setMermaidCode(""); }}
+                style={{
+                  padding: "13px 22px", borderRadius: 12,
+                  border: "1.5px solid #818cf860", background: "rgba(129,140,248,0.08)",
+                  color: "#818cf8", fontFamily: "'DM Sans', sans-serif",
+                  fontWeight: 600, fontSize: 14, cursor: "pointer",
+                }}
+              >
+                ↺ Change Topic
+              </button>
             </div>
-          </div>
+          </Card>
+        )}
 
-          {/* ── MINDMAP DISPLAY ── */}
-          <div style={{ flex:1, padding:"32px 40px", overflow:"auto" }}>
-            <div style={{ maxWidth:1200, margin:"0 auto", minHeight:500 }}>
-
-              {/* Empty state */}
-              {!generated && !loading && (
-                <div style={{
-                  display:"flex", flexDirection:"column", alignItems:"center",
-                  justifyContent:"center", minHeight:480, gap:20,
-                  animation:"fadeup 0.5s ease",
-                }}>
-                  <div style={{ position:"relative", width:120, height:120 }}>
-                    <div style={{ position:"absolute", inset:0, borderRadius:"50%", border:"2px solid rgba(124,58,237,0.2)", animation:"pulse-ring 3s ease-in-out infinite" }}/>
-                    <div style={{ position:"absolute", inset:8, borderRadius:"50%", border:"2px solid rgba(124,58,237,0.15)", animation:"pulse-ring 3s ease-in-out 0.5s infinite" }}/>
-                    <div style={{ width:"100%", height:"100%", borderRadius:"50%", background:"linear-gradient(135deg,rgba(45,22,114,0.6),rgba(124,58,237,0.2))", border:"1px solid rgba(124,58,237,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"3rem", animation:"float 4s ease-in-out infinite" }}>
-                      🧠
-                    </div>
-                  </div>
-                  <div style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.4rem", fontWeight:800, color:"rgba(233,213,255,0.2)", letterSpacing:"-0.03em" }}>
-                    Mind Map Ready to Generate
-                  </div>
-                  <div style={{ fontSize:"0.85rem", color:"rgba(233,213,255,0.12)", maxWidth:320, textAlign:"center", lineHeight:1.7 }}>
-                    Koi bhi topic daalo — Ollama/Mistral se ek visual mind map ban jaayega
-                  </div>
-                </div>
-              )}
-
-              {/* Loading state */}
-              {loading && (
-                <div style={{
-                  display:"flex", flexDirection:"column", alignItems:"center",
-                  justifyContent:"center", minHeight:480, gap:24,
-                }}>
-                  {/* Animated nodes preview */}
-                  <div style={{ position:"relative", width:200, height:200 }}>
-                    {[0,1,2,3,4,5].map(i => (
-                      <div key={i} style={{
-                        position:"absolute",
-                        width: i===0 ? 60 : 36,
-                        height: i===0 ? 60 : 36,
-                        borderRadius:"50%",
-                        background:`radial-gradient(circle, ${["#3b0764","#1e1b4b","#0f172a","#0a0f1e","#0f0a00","#1a0010"][i]}, transparent)`,
-                        border:`2px solid ${["#a855f7","#6366f1","#06b6d4","#10b981","#f59e0b","#f43f5e"][i]}`,
-                        boxShadow:`0 0 16px ${["rgba(168,85,247,0.6)","rgba(99,102,241,0.5)","rgba(6,182,212,0.5)","rgba(16,185,129,0.5)","rgba(245,158,11,0.5)","rgba(244,63,94,0.5)"][i]}`,
-                        top:`${[70, 10, 10, 70, 130, 130][i]}px`,
-                        left:`${[70, 140, 10, 150, 140, 10][i]}px`,
-                        animation:`pulse-ring ${1.5 + i*0.2}s ease-in-out ${i*0.15}s infinite`,
-                      }}/>
-                    ))}
-                  </div>
-                  <div style={{ fontFamily:"'Syne',sans-serif", fontSize:"1rem", fontWeight:700, color:"rgba(233,213,255,0.6)" }}>
-                    Building your mind map…
-                  </div>
-                  <div style={{ fontSize:"0.78rem", color:"rgba(233,213,255,0.25)" }}>
-                    Ollama → Mistral → Mermaid → Render
-                  </div>
-                </div>
-              )}
-
-              {/* Mermaid output */}
-              {generated && !loading && (
-                <div style={{ animation:"fadeup 0.5s ease" }}>
-                  {/* Header row */}
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20 }}>
-                    <div>
-                      <div style={{ fontSize:"0.68rem", fontWeight:600, letterSpacing:"0.15em", textTransform:"uppercase", color:"rgba(192,132,252,0.45)", marginBottom:4 }}>✦ Generated Mind Map</div>
-                      <div style={{ fontFamily:"'Syne',sans-serif", fontSize:"1.2rem", fontWeight:800, color:"var(--mist)", letterSpacing:"-0.02em" }}>
-                        {topic}
-                      </div>
-                    </div>
-                    <div style={{ display:"flex", gap:8 }}>
-                      <button
-                        onClick={() => { setGenerated(false); setMindmapCode(""); setTopic(""); }}
-                        style={{ padding:"8px 16px", background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.18)", borderRadius:10, color:"rgba(252,165,165,0.7)", fontSize:"0.78rem", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}
-                      >✕ Clear</button>
-                      <button
-                        onClick={generateMindmap}
-                        style={{ padding:"8px 16px", background:"rgba(124,58,237,0.15)", border:"1px solid rgba(124,58,237,0.25)", borderRadius:10, color:"#c084fc", fontSize:"0.78rem", cursor:"pointer", fontFamily:"'DM Sans',sans-serif" }}
-                      >↺ Regenerate</button>
-                    </div>
-                  </div>
-
-                  {/* Mermaid container */}
-                  <div style={{
-                    background:"linear-gradient(135deg,rgba(13,7,32,0.9),rgba(6,3,15,0.95))",
-                    border:"1px solid rgba(124,58,237,0.22)",
-                    borderRadius:24,
-                    padding:"32px",
-                    minHeight:520,
-                    position:"relative",
-                    overflow:"auto",
-                    boxShadow:"0 0 60px rgba(91,33,182,0.12), inset 0 0 80px rgba(91,33,182,0.04)",
-                  }}>
-                    {/* Corner accents */}
-                    <div style={{ position:"absolute", top:0, left:0, right:0, height:1, background:"linear-gradient(90deg,transparent,rgba(168,85,247,0.4),rgba(240,171,252,0.2),transparent)", borderRadius:"24px 24px 0 0" }}/>
-                    <div style={{ position:"absolute", top:16, left:16, width:8, height:8, borderRadius:2, background:"rgba(168,85,247,0.4)" }}/>
-                    <div style={{ position:"absolute", top:16, right:16, width:8, height:8, borderRadius:2, background:"rgba(168,85,247,0.4)" }}/>
-
-                    <div
-                      ref={mermaidRef}
-                      className="mermaid"
-                      style={{ display:"flex", justifyContent:"center", alignItems:"center", minHeight:450 }}
-                    />
-                  </div>
-
-                  {/* Raw code toggle */}
-                  <details style={{ marginTop:16 }}>
-                    <summary style={{ cursor:"pointer", fontSize:"0.72rem", color:"rgba(192,132,252,0.4)", userSelect:"none", letterSpacing:"0.08em" }}>
-                      ▸ Raw Mermaid Code
-                    </summary>
-                    <pre style={{
-                      marginTop:8, padding:"16px 20px",
-                      background:"rgba(13,7,32,0.8)", border:"1px solid rgba(91,33,182,0.15)",
-                      borderRadius:12, fontSize:"0.75rem", color:"rgba(192,132,252,0.6)",
-                      overflowX:"auto", lineHeight:1.7, fontFamily:"monospace",
-                    }}>
-                      {mindmapCode}
-                    </pre>
-                  </details>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        {/* Raw Mermaid Code (collapsed) */}
+        {mermaidCode && step === 3 && (
+          <details style={{ marginTop: 4 }}>
+            <summary style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#6b6b85",
+              cursor: "pointer", userSelect: "none", letterSpacing: 1,
+            }}>
+              View raw Mermaid code
+            </summary>
+            <pre style={{
+              background: "#0e0e18", border: "1px solid #1e1e2e", borderRadius: 12,
+              padding: 20, marginTop: 10, fontSize: 12, color: "#a0a0b8",
+              fontFamily: "'Space Mono', monospace", overflowX: "auto",
+              lineHeight: 1.6,
+            }}>
+              {mermaidCode}
+            </pre>
+          </details>
+        )}
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 28, right: 28,
+          background: "#13131e",
+          border: `1px solid ${toast.type === "error" ? "#f87171" : toast.type === "success" ? "#34d399" : "#38bdf8"}`,
+          color: toast.type === "error" ? "#f87171" : toast.type === "success" ? "#34d399" : "#38bdf8",
+          borderRadius: 12, padding: "13px 20px",
+          fontFamily: "'Space Mono', monospace", fontSize: 12,
+          animation: "toastIn 0.3s ease",
+          zIndex: 999, maxWidth: 320, lineHeight: 1.5,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+        }}>
+          {toast.msg}
+        </div>
+      )}
     </>
   );
-};
-
-export default MindmapPage;
-
-// import React, { useState, useEffect } from "react";
-// import mermaid from "mermaid";
-
-// const Mindmap: React.FC = () => {
-//   const [file, setFile] = useState<File | null>(null);
-//   const [keywords, setKeywords] = useState<string[]>([]);
-//   const [selectedKeyword, setSelectedKeyword] = useState("");
-//   const [mindmap, setMindmap] = useState("");
-//   const [loading, setLoading] = useState(false);
-
-//   useEffect(() => {
-//     mermaid.initialize({ startOnLoad: true });
-//   }, []);
-
-//   // Upload file and get keywords
-//   const uploadFile = async () => {
-//     if (!file) return;
-
-//     const formData = new FormData();
-//     formData.append("file", file);
-
-//     try {
-//       const res = await fetch("http://localhost:8000/upload-file", {
-//         method: "POST",
-//         body: formData
-//       });
-
-//       const data = await res.json();
-//       setKeywords(data.keywords);
-//     } catch (error) {
-//       console.error("Upload error", error);
-//     }
-//   };
-
-//   // Generate mindmap
-//   const generateMindmap = async () => {
-//     if (!selectedKeyword) return;
-
-//     setLoading(true);
-
-//     try {
-//       const res = await fetch("http://localhost:8000/mindmap/upload-file", {
-//         method: "POST",
-//         headers: {
-//           "Content-Type": "application/json"
-//         },
-//         body: JSON.stringify({ topic: selectedKeyword })
-//       });
-
-//       const data = await res.json();
-//       setMindmap(data.mindmap);
-//     } catch (error) {
-//       console.error(error);
-//     }
-
-//     setLoading(false);
-//   };
-
-//   useEffect(() => {
-//     if (mindmap) {
-//       mermaid.contentLoaded();
-//     }
-//   }, [mindmap]);
-
-//   return (
-//     <div style={{ padding: "30px" }}>
-//       <h2>AI Mindmap Generator</h2>
-
-//       {/* File Upload */}
-//       <div style={{ marginBottom: "20px" }}>
-//         <input
-//           type="file"
-//           onChange={(e) => setFile(e.target.files?.[0] || null)}
-//         />
-
-//         <button onClick={uploadFile}>
-//           Upload File
-//         </button>
-//       </div>
-
-//       {/* Keywords */}
-//       {keywords.length > 0 && (
-//         <div style={{ marginBottom: "20px" }}>
-//           <h4>Select Topic</h4>
-
-//           {keywords.map((word, index) => (
-//             <button
-//               key={index}
-//               onClick={() => setSelectedKeyword(word)}
-//               style={{
-//                 margin: "5px",
-//                 padding: "8px 12px"
-//               }}
-//             >
-//               {word}
-//             </button>
-//           ))}
-//         </div>
-//       )}
-
-//       {/* Generate Mindmap */}
-//       {selectedKeyword && (
-//         <button onClick={generateMindmap}>
-//           {loading ? "Generating..." : "Generate Mindmap"}
-//         </button>
-//       )}
-
-//       {/* Mermaid Mindmap */}
-//       <div style={{ marginTop: "30px" }}>
-//         <div className="mermaid">{mindmap}</div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// export default Mindmap;
+}

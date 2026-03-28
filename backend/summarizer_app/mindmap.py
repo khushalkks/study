@@ -1,147 +1,134 @@
-# import requests
-
-
-# def clean_mermaid_output(text: str) -> str:
-#     if not text:
-#         return ""
-
-#     # Remove markdown fences
-#     text = text.replace("```mermaid", "")
-#     text = text.replace("```", "")
-
-#     # Remove everything before mindmap
-#     if "mindmap" in text:
-#         text = text[text.index("mindmap"):]
-
-#     return text.strip()
-
-
-# def fix_mermaid_format(text: str, topic: str) -> str:
-#     """
-#     Convert LLM tree-style output into strict Mermaid mindmap format.
-#     """
-
-#     lines = text.splitlines()
-
-#     fixed_lines = ["mindmap", f"  root(({topic}))"]
-
-#     for line in lines:
-#         line = line.strip()
-
-#         if not line:
-#             continue
-
-#         # Skip first mindmap line
-#         if line.lower() == "mindmap":
-#             continue
-
-#         # Remove tree markers like |-
-#         line = line.replace("|-", "").strip()
-
-#         # Remove bullets if present
-#         if line.startswith("-"):
-#             line = line[1:].strip()
-
-#         fixed_lines.append(f"    {line}")
-
-#     return "\n".join(fixed_lines)
-
-
-# def generate_mindmap(topic: str) -> str:
-
-#     if not topic.strip():
-#         return "mindmap\n  root((Invalid Topic))"
-
-#     url = "http://localhost:11434/api/generate"
-
-#     prompt = f"""
-# Generate a structured mind map in Mermaid mindmap format.
-
-# Rules:
-# - Only output valid Mermaid mindmap syntax
-# - Use indentation (no |- symbols)
-# - Start directly with: mindmap
-# - No explanation text
-
-# Topic: {topic}
-# """
-
-#     payload = {
-#         "model": "mistral",
-#         "prompt": prompt,
-#         "stream": False
-#     }
-
-#     try:
-#         response = requests.post(url, json=payload)
-#         data = response.json()
-
-#         output_text = data.get("response", "")
-
-#         cleaned = clean_mermaid_output(output_text)
-
-#         final_output = fix_mermaid_format(cleaned, topic)
-
-#         return final_output
-
-#     except Exception as e:
-#         print("Ollama Error:", str(e))
-#         return f"""mindmap
-#   root(({topic}))
-#     Error
-#       Ollama not running
-# """
-
+import io
 import requests
 import json
+import re
+import PyPDF2
+import docx
+
+# ── Config ────────────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 MODEL = "mistral"
 
 
-def json_to_mermaid(tree):
+# ── File Text Extraction ──────────────────────────────────────────────────────
 
-    mermaid = ["mindmap"]
+def extract_text_from_file(file) -> str:
+    """
+    Extract plain text from:
+      - io.BytesIO object  (with .filename attribute set by routes.py)
+      - file path string   (used by summarizer)
+      - FastAPI UploadFile (with .filename attribute)
+    """
 
-    def walk(node, level=1):
-        indent = "  " * level
-        mermaid.append(f"{indent}{node['name']}")
+    # ── Case 1: file path string (e.g. from summarizer) ──────────────────────
+    if isinstance(file, str):
+        filename = file.lower()
+        if filename.endswith(".pdf"):
+            with open(file, "rb") as f:
+                reader = PyPDF2.PdfReader(f)
+                return "\n".join(page.extract_text() or "" for page in reader.pages)
+        elif filename.endswith(".docx"):
+            doc = docx.Document(file)
+            return "\n".join(para.text for para in doc.paragraphs)
+        elif filename.endswith(".txt"):
+            with open(file, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read()
+        else:
+            raise ValueError(f"Unsupported file type: {file}")
 
-        for child in node.get("children", []):
-            walk(child, level + 1)
+    # ── Case 2: BytesIO or UploadFile (has .filename attribute) ──────────────
+    filename = getattr(file, "filename", "").lower()
 
-    walk(tree)
+    # BytesIO se pehle pointer reset karo
+    if isinstance(file, io.BytesIO):
+        file.seek(0)
 
-    return "\n".join(mermaid)
+    if filename.endswith(".pdf"):
+        reader = PyPDF2.PdfReader(file)
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+    elif filename.endswith(".docx"):
+        doc = docx.Document(file)
+        return "\n".join(para.text for para in doc.paragraphs)
+
+    elif filename.endswith(".txt"):
+        raw = file.read()
+        return raw.decode("utf-8", errors="ignore") if isinstance(raw, bytes) else raw
+
+    else:
+        raise ValueError(f"Unsupported file type: {filename or 'unknown'}")
 
 
-def generate_mindmap(topic: str):
+# ── Keyword Extraction via Ollama ─────────────────────────────────────────────
 
+def extract_keywords(text: str) -> list[str]:
+    """Ask the LLM to pull the top keywords from the document."""
+    snippet = text[:4000]
+
+    prompt = f"""
+Extract the 5 most important keywords or key concepts from the following text.
+
+Return ONLY a JSON array of strings. No explanation, no markdown.
+
+Example output: ["Machine Learning", "Neural Networks", "Training Data", "Overfitting", "Gradient Descent"]
+
+Text:
+{snippet}
+"""
+
+    payload = {
+        "model": MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.3}
+    }
+
+    resp = requests.post(OLLAMA_URL, json=payload, timeout=60)
+    raw = resp.json().get("response", "[]")
+
+    # Strip markdown fences if present
+    raw = re.sub(r"```[a-z]*", "", raw).strip().strip("`").strip()
+
+    try:
+        keywords = json.loads(raw)
+        if isinstance(keywords, list):
+            return [str(k) for k in keywords[:5]]
+    except Exception:
+        pass
+
+    # Fallback: grab quoted strings
+    return re.findall(r'"([^"]+)"', raw)[:5]
+
+
+# ── Mindmap Tree Generation via Ollama ────────────────────────────────────────
+
+def generate_tree(topic: str) -> dict:
+    """Ask the LLM to create a nested knowledge tree for a topic."""
     prompt = f"""
 Create a structured knowledge tree for the topic.
 
-Return ONLY JSON.
+Return ONLY JSON — no explanation, no markdown fences.
 
 Format:
-
 {{
- "name": "{topic}",
- "children":[
+  "name": "{topic}",
+  "children": [
     {{
-      "name":"Concept",
-      "children":[
-          {{"name":"Subtopic"}},
-          {{"name":"Subtopic"}}
+      "name": "Concept",
+      "children": [
+        {{"name": "Subtopic"}},
+        {{"name": "Subtopic"}}
       ]
     }}
- ]
+  ]
 }}
 
 Topic: {topic}
 
 Rules:
-- Create 3 main branches
-- Each branch must contain 3 subtopics
+- Create exactly 3 main branches
+- Each branch must have exactly 3 subtopics
 - Return JSON only
 """
 
@@ -149,231 +136,50 @@ Rules:
         "model": MODEL,
         "prompt": prompt,
         "stream": False,
-        "options": {
-            "temperature": 0.7
-        }
+        "options": {"temperature": 0.7}
     }
 
-    response = requests.post(OLLAMA_URL, json=payload)
-
-    data = response.json()
-
-    text = data.get("response", "")
-
-    try:
-        tree = json.loads(text)
-        return json_to_mermaid(tree)
-    except:
-        return f"""mindmap
-  root(({topic}))
-    Error
-      Could not parse model output
-"""
-
-# import requests
-# import json
-
-# OLLAMA_URL = "http://localhost:11434/api/generate"
-# MODEL = "mistral"
-
-
-# # -----------------------------
-# # Clean JSON from LLM response
-# # -----------------------------
-# def clean_llm_json(text: str) -> str:
-
-#     if not text:
-#         return ""
-
-#     text = text.strip()
-
-#     text = text.replace("```json", "")
-#     text = text.replace("```", "")
-
-#     start = text.find("{")
-#     end = text.rfind("}") + 1
-
-#     if start != -1 and end != -1:
-#         text = text[start:end]
-
-#     return text
-
-
-# # -----------------------------
-# # Convert JSON → Mermaid
-# # -----------------------------
-# def json_to_mermaid(tree: dict) -> str:
-
-#     mermaid = ["mindmap"]
-
-#     def walk(node, level=1):
-
-#         indent = "  " * level
-
-#         if level == 1:
-#             mermaid.append(f"{indent}root(({node['name']}))")
-#         else:
-#             mermaid.append(f"{indent}{node['name']}")
-
-#         for child in node.get("children", []):
-#             walk(child, level + 1)
-
-#     walk(tree)
-
-#     return "\n".join(mermaid)
-
-
-# # -----------------------------
-# # Generate Mindmap
-# # -----------------------------
-# def generate_mindmap(topic: str):
-
-#     if not topic:
-#         return {
-#             "tree": None,
-#             "mermaid": "mindmap\n  root((Invalid Topic))"
-#         }
-
-#     prompt = f"""
-# Generate a knowledge tree for the topic.
-
-# Return ONLY JSON.
-
-# Example:
-
-# {{
-#  "name": "{topic}",
-#  "children":[
-#    {{
-#      "name":"Concept",
-#      "children":[
-#         {{"name":"Detail"}},
-#         {{"name":"Detail"}}
-#      ]
-#    }}
-#  ]
-# }}
-
-# Topic: {topic}
-# """
-
-#     payload = {
-#         "model": MODEL,
-#         "prompt": prompt,
-#         "stream": False,
-#         "options": {"temperature": 0.7}
-#     }
-
-#     try:
-
-#         response = requests.post(OLLAMA_URL, json=payload)
-
-#         data = response.json()
-
-#         text = data.get("response", "")
-
-#         print("RAW LLM OUTPUT:", text)
-
-#         cleaned = clean_llm_json(text)
-
-#         if not cleaned:
-#             raise ValueError("Empty JSON")
-
-#         tree = json.loads(cleaned)
-
-#         mermaid = json_to_mermaid(tree)
-
-#         return {
-#             "tree": tree,
-#             "mermaid": mermaid
-#         }
-
-#     except Exception as e:
-
-#         print("Mindmap generation failed:", e)
-
-#         return {
-#             "tree": None,
-#             "mermaid": f"""mindmap
-#   root(({topic}))
-#     Concept
-#       Example
-#       Example
-# """
-#         }
-
-# # -----------------------------
-# # Add Node
-# # -----------------------------
-# def add_node(tree: dict, parent_name: str, new_node: str):
-
-#     if tree["name"] == parent_name:
-#         tree.setdefault("children", []).append({"name": new_node})
-#         return True
-
-#     for child in tree.get("children", []):
-#         if add_node(child, parent_name, new_node):
-#             return True
-
-#     return False
-
-
-# # -----------------------------
-# # Delete Node
-# # -----------------------------
-# def delete_node(tree: dict, node_name: str):
-
-#     children = tree.get("children", [])
-
-#     for child in children:
-
-#         if child["name"] == node_name:
-#             children.remove(child)
-#             return True
-
-#         if delete_node(child, node_name):
-#             return True
-
-#     return False
-
-
-# # -----------------------------
-# # Expand Node using AI
-# # -----------------------------
-# def expand_node(node_name: str):
-
-#     prompt = f"""
-# Expand this concept into subtopics.
-
-# Return JSON:
-
-# {{
-#  "children":[
-#    {{"name":"subtopic"}},
-#    {{"name":"subtopic"}},
-#    {{"name":"subtopic"}}
-#  ]
-# }}
-
-# Concept: {node_name}
-# """
-
-#     payload = {
-#         "model": MODEL,
-#         "prompt": prompt,
-#         "stream": False
-#     }
-
-#     try:
-
-#         response = requests.post(OLLAMA_URL, json=payload)
-
-#         data = response.json()
-
-#         text = clean_llm_json(data.get("response", ""))
-
-#         return json.loads(text)
-
-#     except:
-
-#         return {"children": []}
+    resp = requests.post(OLLAMA_URL, json=payload, timeout=90)
+    raw = resp.json().get("response", "")
+    raw = re.sub(r"```[a-z]*", "", raw).strip().strip("`").strip()
+
+    return json.loads(raw)
+
+
+# ── JSON → Mermaid Converter ──────────────────────────────────────────────────
+
+def json_to_mermaid(tree: dict) -> str:
+    lines = ["mindmap"]
+
+    def walk(node, level=1):
+        indent = "  " * level
+        name = node.get("name", "?")
+        if level == 1:
+            lines.append(f"{indent}root(({name}))")
+        elif level == 2:
+            lines.append(f"{indent}[{name}]")
+        else:
+            lines.append(f"{indent}{name}")
+        for child in node.get("children", []):
+            walk(child, level + 1)
+
+    walk(tree)
+    return "\n".join(lines)
+
+
+# ── Main pipeline function (called from routes.py) ────────────────────────────
+
+def generate_mindmap(file) -> dict:
+    """Full pipeline: file → keywords → mermaid mindmap."""
+    text = extract_text_from_file(file)
+    keywords = extract_keywords(text)
+    primary = keywords[0] if keywords else "Document"
+    tree = generate_tree(primary)
+    mermaid = json_to_mermaid(tree)
+
+    return {
+        "keywords": keywords,
+        "primary_topic": primary,
+        "mermaid": mermaid,
+        "tree": tree
+    }
