@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Home from "./pages/Home";
-import Dashboard from "./pages/dashboard";
+import Dashboard from "./pages/Dashboard";
 import InterviewPage from "./pages/MockInterview";
 import Resume from "./pages/Resume";
 import Community from "./pages/Community";
