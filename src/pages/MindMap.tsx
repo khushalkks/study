@@ -1,5 +1,16 @@
-
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  UploadCloud,
+  Search,
+  Workflow,
+  Download,
+  RotateCcw,
+  Sparkles,
+  CheckCircle2
+} from "lucide-react";
+import { motion } from "framer-motion";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Step = 1 | 2 | 3;
@@ -10,12 +21,9 @@ interface Toast {
   type: ToastType;
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-// ✅ FastAPI default port (Flask waala 5000 nahi!)
-const API = "http://localhost:8000";
+const API = "http://localhost:8000/api";
 const ACCEPTED = [".pdf", ".docx", ".txt"];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function formatBytes(bytes: number): string {
   return bytes < 1024 * 1024
     ? `${(bytes / 1024).toFixed(1)} KB`
@@ -24,24 +32,8 @@ function formatBytes(bytes: number): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function GridBg() {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundImage:
-          "linear-gradient(rgba(56,189,248,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(56,189,248,0.04) 1px, transparent 1px)",
-        backgroundSize: "52px 52px",
-        pointerEvents: "none",
-        zIndex: 0,
-      }}
-    />
-  );
-}
-
 function StepTracker({ step }: { step: Step }) {
-  const steps = ["Upload", "Keywords", "Mindmap"];
+  const steps = ["Upload", "Topics", "Mindmap"];
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 44 }}>
       {steps.map((label, i) => {
@@ -53,28 +45,28 @@ function StepTracker({ step }: { step: Step }) {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <div
                 style={{
-                  width: 28,
-                  height: 28,
+                  width: 32,
+                  height: 32,
                   borderRadius: "50%",
-                  border: `2px solid ${isDone ? "#34d399" : isActive ? "#38bdf8" : "#2a2a3d"}`,
-                  background: isDone ? "#34d399" : isActive ? "#38bdf8" : "transparent",
+                  border: `2px solid ${isDone ? "#4f46e5" : isActive ? "#6366f1" : "#e2e8f0"}`,
+                  background: isDone ? "#4f46e5" : isActive ? "#6366f1" : "#fff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 11,
-                  fontFamily: "'Space Mono', monospace",
-                  color: isDone || isActive ? "#0a0a0f" : "#6b6b85",
+                  fontSize: 12,
+                  color: isDone || isActive ? "#fff" : "#94a3b8",
                   transition: "all 0.35s",
                   fontWeight: 700,
+                  boxShadow: isActive ? "0 0 15px rgba(99, 102, 241, 0.3)" : "none"
                 }}
               >
                 {isDone ? "✓" : num}
               </div>
               <span
                 style={{
-                  fontSize: 12,
-                  fontFamily: "'Space Mono', monospace",
-                  color: isDone ? "#34d399" : isActive ? "#38bdf8" : "#6b6b85",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: isDone || isActive ? "#1e293b" : "#94a3b8",
                   transition: "color 0.35s",
                 }}
               >
@@ -84,10 +76,10 @@ function StepTracker({ step }: { step: Step }) {
             {i < 2 && (
               <div
                 style={{
-                  width: 48,
-                  height: 1,
-                  background: isDone ? "#34d399" : "#2a2a3d",
-                  margin: "0 10px",
+                  width: 60,
+                  height: 2,
+                  background: isDone ? "#4f46e5" : "#e2e8f0",
+                  margin: "0 12px",
                   transition: "background 0.4s",
                 }}
               />
@@ -103,40 +95,16 @@ function Card({ children, style }: { children: React.ReactNode; style?: React.CS
   return (
     <div
       style={{
-        background: "#13131e",
-        border: "1px solid #1e1e2e",
-        borderRadius: 20,
-        padding: 32,
+        background: "#ffffff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 24,
+        padding: 40,
         marginBottom: 20,
         position: "relative",
         overflow: "hidden",
-        animation: "fadeUp 0.4s ease forwards",
+        boxShadow: "0 10px 30px rgba(0,0,0,0.04)",
+        animation: "fadeUp 0.5s ease forwards",
         ...style,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          top: 0, left: "15%", right: "15%",
-          height: 1,
-          background: "linear-gradient(90deg, transparent, #38bdf840, transparent)",
-        }}
-      />
-      {children}
-    </div>
-  );
-}
-
-function CardLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 10,
-        fontFamily: "'Space Mono', monospace",
-        letterSpacing: 4,
-        textTransform: "uppercase" as const,
-        color: "#38bdf8",
-        marginBottom: 18,
       }}
     >
       {children}
@@ -149,16 +117,16 @@ function Spinner() {
     <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", gap: 16, padding: 40 }}>
       <div
         style={{
-          width: 44,
-          height: 44,
+          width: 48,
+          height: 48,
           borderRadius: "50%",
-          border: "3px solid #1e1e2e",
-          borderTopColor: "#38bdf8",
-          animation: "spin 0.75s linear infinite",
+          border: "4px solid #f1f5f9",
+          borderTopColor: "#4f46e5",
+          animation: "spin 0.8s linear infinite",
         }}
       />
-      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85" }}>
-        Thinking with Ollama…
+      <span style={{ fontWeight: 600, fontSize: 14, color: "#64748b" }}>
+        AI is thinking…
       </span>
     </div>
   );
@@ -166,6 +134,7 @@ function Spinner() {
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function MindMapGenerator() {
+  const navigate = useNavigate();
   const [step, setStep] = useState<Step>(1);
   const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -179,7 +148,6 @@ export default function MindMapGenerator() {
   const mermaidRef = useRef<HTMLDivElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load mermaid dynamically
   useEffect(() => {
     if (mermaidCode) renderMermaid(mermaidCode);
   }, [mermaidCode]);
@@ -187,19 +155,19 @@ export default function MindMapGenerator() {
   async function renderMermaid(code: string) {
     try {
       const m = await import("https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs" as string) as any;
-      m.default.initialize({ startOnLoad: false, theme: "default", securityLevel: "loose" });
+      m.default.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose" });
       const id = "mm-" + Date.now();
       const { svg } = await m.default.render(id, code);
       setMermaidSvg(svg);
     } catch {
-      setMermaidSvg(`<p style="color:#f87171;font-family:monospace;font-size:13px">Could not render diagram.</p>`);
+      setMermaidSvg(`<p style="color:#ef4444;font-family:sans-serif;font-size:14px">Could not render diagram.</p>`);
     }
   }
 
   function showToast(msg: string, type: ToastType = "info") {
     setToast({ msg, type });
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3200);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
   }
 
   function validateFile(f: File): boolean {
@@ -229,22 +197,16 @@ export default function MindMapGenerator() {
     try {
       const form = new FormData();
       form.append("file", file);
-
-      // ✅ Correct FastAPI endpoint
       const res = await fetch(`${API}/mindmap/upload`, { method: "POST", body: form });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Server error ${res.status}`);
       }
-
       const data = await res.json();
-      // ✅ Backend returns: { filename, keywords, primary_topic, mermaid, tree }
       if (!data.keywords?.length) throw new Error("No keywords found in document");
-
       setKeywords(data.keywords);
       setStep(2);
-      showToast(`${data.keywords.length} keywords extracted!`, "success");
+      showToast(`${data.keywords.length} topics extracted!`, "success");
     } catch (e: any) {
       showToast("Extract failed: " + e.message, "error");
     } finally {
@@ -259,25 +221,21 @@ export default function MindMapGenerator() {
     setLoading(true);
     setMermaidSvg("");
     try {
-      // ✅ Correct FastAPI endpoint — matches MindmapTopicRequest(topic: str)
       const res = await fetch(`${API}/mindmap/topic`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ topic }),
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Server error ${res.status}`);
       }
-
       const data = await res.json();
-      // ✅ Backend returns: { topic, mermaid, tree }
       if (!data.mermaid) throw new Error("No mindmap returned from server");
       setMermaidCode(data.mermaid);
     } catch (e: any) {
       showToast("Mindmap failed: " + e.message, "error");
-      setMermaidSvg(`<p style="color:#f87171">Error: ${e.message}</p>`);
+      setMermaidSvg(`<p style="color:#ef4444">Error: ${e.message}</p>`);
     } finally {
       setLoading(false);
     }
@@ -305,34 +263,46 @@ export default function MindMapGenerator() {
   const activeTopic = selected || customTopic.trim();
 
   return (
-    <>
+    <div style={{ background: '#f8fafc', minHeight: '100vh', fontFamily: "'Inter', sans-serif", color: '#1e293b' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;600&display=swap');
-        @keyframes fadeUp { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+        @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0a0a0f; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0a0f; }
-        ::-webkit-scrollbar-thumb { background: #2a2a3d; border-radius: 99px; }
       `}</style>
 
-      <GridBg />
+      {/* Nav */}
+      <nav style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        padding: '20px 48px', background: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(16px)', position: 'sticky', top: 0, zIndex: 100,
+        borderBottom: '1px solid #e2e8f0'
+      }}>
+        <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => navigate("/")}>
+          ⬡ Cortex MindMap
+        </div>
+        <button
+          onClick={() => navigate("/dashboard")}
+          style={{ background: 'none', border: '1px solid #e2e8f0', padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 600, color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <ArrowLeft size={16} /> Dashboard
+        </button>
+      </nav>
 
-      <div style={{ position: "relative", zIndex: 1, maxWidth: 860, margin: "0 auto", padding: "52px 24px 100px", fontFamily: "'DM Sans', sans-serif", color: "#e8e8f2" }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "60px 24px 120px" }}>
 
         {/* Header */}
-        <header style={{ textAlign: "center", marginBottom: 56 }}>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 5, textTransform: "uppercase", color: "#38bdf8", marginBottom: 18 }}>
-            ⬡ MindMap AI
-          </div>
-          <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: "clamp(38px,6vw,66px)", fontWeight: 400, lineHeight: 1.08, letterSpacing: "-1px", color: "#f0f0f8" }}>
-            Documents become<br />
-            <em style={{ color: "#38bdf8", fontStyle: "italic" }}>visual knowledge</em>
+        <header style={{ textAlign: "center", marginBottom: 60 }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#e0e7ff', color: '#4338ca', padding: '6px 16px', borderRadius: '100px', fontWeight: 700, fontSize: '0.8rem', marginBottom: 20 }}>
+            <Sparkles size={14} /> AI Visualization
+          </motion.div>
+          <h1 style={{ fontSize: "clamp(2rem, 5vw, 2.5rem)", fontWeight: 800, color: "#0f172a", marginBottom: 16 }}>
+            Turn concepts into<br />
+            <span style={{ color: "#4f46e5" }}>Visual Knowledge.</span>
           </h1>
-          <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85", marginTop: 14 }}>
-            Upload → Extract Keywords → Generate Mindmap
+          <p style={{ color: "#64748b", fontSize: "1.1rem", fontFamily: 'Lora', maxWidth: 500, margin: '0 auto' }}>
+            Our AI analyzes your documents and builds interactive branching maps to help you master structure.
           </p>
         </header>
 
@@ -341,19 +311,23 @@ export default function MindMapGenerator() {
         {/* ── STEP 1: Upload ── */}
         {step === 1 && (
           <Card>
-            <CardLabel>Step 01 — Upload Document</CardLabel>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+              <UploadCloud size={20} color="#4f46e5" />
+              <span style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Step 01 — Upload Document</span>
+            </div>
+
             <div
               onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={handleFileDrop}
               style={{
-                border: `2px dashed ${dragging ? "#38bdf8" : file ? "#34d399" : "#2a2a3d"}`,
-                borderRadius: 14,
+                border: `2px dashed ${dragging ? "#4f46e5" : file ? "#4f46e5" : "#e2e8f0"}`,
+                borderRadius: 20,
                 padding: "48px 24px",
                 textAlign: "center",
                 cursor: "pointer",
-                transition: "all 0.25s",
-                background: dragging ? "rgba(56,189,248,0.06)" : "transparent",
+                transition: "all 0.3s",
+                background: dragging ? "#f5f3ff" : "#fafafa",
                 position: "relative",
               }}
             >
@@ -363,41 +337,49 @@ export default function MindMapGenerator() {
                 onChange={handleFileInput}
                 style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%", height: "100%" }}
               />
-              <div style={{ fontSize: 42, marginBottom: 14 }}>{file ? "✅" : "📄"}</div>
+              <div style={{
+                width: 64, height: 64, background: '#fff', borderRadius: '16px',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.05)', display: 'flex',
+                alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px'
+              }}>
+                <UploadCloud size={32} color={file ? "#4f46e5" : "#cbd5e1"} />
+              </div>
               {file ? (
                 <>
-                  <div style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 16, color: "#34d399" }}>{file.name}</div>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#6b6b85", marginTop: 4 }}>{formatBytes(file.size)}</div>
+                  <div style={{ fontWeight: 700, fontSize: 18, color: "#1e293b" }}>{file.name}</div>
+                  <div style={{ fontSize: 13, color: "#94a3b8", marginTop: 4 }}>{formatBytes(file.size)}</div>
                 </>
               ) : (
                 <>
-                  <div style={{ fontWeight: 600, fontSize: 17, marginBottom: 6 }}>Drop your file here</div>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85" }}>Supports .pdf &nbsp;·&nbsp; .docx &nbsp;·&nbsp; .txt</div>
+                  <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 8, color: '#1e293b' }}>Drop your file here</div>
+                  <div style={{ fontSize: 14, color: "#94a3b8" }}>PDF, DOCX, or TXT (Max 10MB)</div>
                 </>
               )}
             </div>
 
-            <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+            <div style={{ marginTop: 32 }}>
               <button
                 onClick={extractKeywords}
                 disabled={!file || loading}
                 style={{
-                  padding: "13px 28px",
-                  borderRadius: 12,
+                  width: '100%',
+                  padding: "16px 28px",
+                  borderRadius: 14,
                   border: "none",
-                  background: file && !loading ? "linear-gradient(135deg,#38bdf8,#818cf8)" : "#1e1e2e",
-                  color: file && !loading ? "#0a0a0f" : "#6b6b85",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 600,
-                  fontSize: 15,
+                  background: file && !loading ? "#4f46e5" : "#f1f5f9",
+                  color: file && !loading ? "#ffffff" : "#94a3b8",
+                  fontWeight: 700,
+                  fontSize: 16,
                   cursor: file && !loading ? "pointer" : "not-allowed",
                   transition: "all 0.2s",
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
+                  justifyContent: 'center',
+                  gap: 10,
+                  boxShadow: file && !loading ? '0 10px 20px rgba(79, 70, 229, 0.2)' : 'none'
                 }}
               >
-                {loading ? "Extracting…" : "Extract Keywords →"}
+                {loading ? "Processing Document…" : <>Next: Extract Topics <ArrowLeft size={18} style={{ transform: 'rotate(180deg)' }} /></>}
               </button>
             </div>
           </Card>
@@ -406,28 +388,30 @@ export default function MindMapGenerator() {
         {/* ── STEP 2: Keywords ── */}
         {step === 2 && (
           <Card>
-            <CardLabel>Step 02 — Choose Your Topic</CardLabel>
-            <p style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#6b6b85", marginBottom: 18 }}>
-              AI ne ye keywords nikale — ek select karo ya khud type karo:
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+              <Search size={20} color="#4f46e5" />
+              <span style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Step 02 — Choose a Topic</span>
+            </div>
+
+            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 20 }}>
+              AI has identified these key concepts. Select one to map it out, or enter your own:
             </p>
 
-            {/* Keyword chips */}
-            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 10, marginBottom: 28 }}>
+            <div style={{ display: "flex", flexWrap: "wrap" as const, gap: 10, marginBottom: 32 }}>
               {keywords.map((kw) => (
                 <button
                   key={kw}
                   onClick={() => { setSelected(kw); setCustomTopic(""); }}
                   style={{
-                    padding: "9px 18px",
-                    borderRadius: 100,
-                    border: `1.5px solid ${selected === kw ? "#38bdf8" : "#2a2a3d"}`,
-                    background: selected === kw ? "rgba(56,189,248,0.15)" : "transparent",
-                    color: selected === kw ? "#38bdf8" : "#a0a0b8",
-                    fontFamily: "'Space Mono', monospace",
-                    fontSize: 13,
+                    padding: "10px 20px",
+                    borderRadius: "12px",
+                    border: `2px solid ${selected === kw ? "#4f46e5" : "#f1f5f9"}`,
+                    background: selected === kw ? "#eef2ff" : "#fff",
+                    color: selected === kw ? "#4f46e5" : "#64748b",
+                    fontSize: 14,
+                    fontWeight: 600,
                     cursor: "pointer",
                     transition: "all 0.2s",
-                    fontWeight: selected === kw ? 700 : 400,
                   }}
                 >
                   {kw}
@@ -435,33 +419,25 @@ export default function MindMapGenerator() {
               ))}
             </div>
 
-            {/* Divider */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-              <div style={{ flex: 1, height: 1, background: "#1e1e2e" }} />
-              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#6b6b85" }}>ya khud type karo</span>
-              <div style={{ flex: 1, height: 1, background: "#1e1e2e" }} />
-            </div>
-
-            <div style={{ display: "flex", gap: 10, marginBottom: 28 }}>
+            <div style={{ position: 'relative', marginBottom: 32 }}>
               <input
                 type="text"
                 value={customTopic}
                 onChange={(e) => { setCustomTopic(e.target.value); setSelected(""); }}
-                placeholder="Koi bhi topic…"
+                placeholder="Or type a custom topic to map..."
                 style={{
-                  flex: 1,
-                  background: "#0e0e18",
-                  border: "1.5px solid #2a2a3d",
-                  borderRadius: 12,
-                  padding: "12px 18px",
-                  fontFamily: "'Space Mono', monospace",
-                  fontSize: 13,
-                  color: "#e8e8f2",
+                  width: '100%',
+                  background: "#fff",
+                  border: "2px solid #f1f5f9",
+                  borderRadius: 14,
+                  padding: "14px 18px",
+                  fontSize: 15,
+                  color: "#1e293b",
                   outline: "none",
-                  transition: "border-color 0.2s",
+                  transition: "all 0.2s",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "#38bdf8")}
-                onBlur={(e) => (e.target.style.borderColor = "#2a2a3d")}
+                onFocus={(e) => (e.target.style.borderColor = "#4f46e5")}
+                onBlur={(e) => (e.target.style.borderColor = "#f1f5f9")}
               />
             </div>
 
@@ -470,35 +446,33 @@ export default function MindMapGenerator() {
                 onClick={generateMindmap}
                 disabled={!activeTopic || loading}
                 style={{
-                  padding: "13px 28px",
-                  borderRadius: 12,
+                  flex: 1,
+                  padding: "16px",
+                  borderRadius: 14,
                   border: "none",
-                  background: activeTopic && !loading ? "linear-gradient(135deg,#38bdf8,#818cf8)" : "#1e1e2e",
-                  color: activeTopic && !loading ? "#0a0a0f" : "#6b6b85",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 600,
-                  fontSize: 15,
+                  background: activeTopic && !loading ? "#4f46e5" : "#f1f5f9",
+                  color: activeTopic && !loading ? "#ffffff" : "#94a3b8",
+                  fontWeight: 700,
+                  fontSize: 16,
                   cursor: activeTopic && !loading ? "pointer" : "not-allowed",
                   transition: "all 0.2s",
                 }}
               >
-                {loading ? "Generating…" : "Generate Mindmap →"}
+                {loading ? "Generating Map…" : "Generate MindMap"}
               </button>
               <button
-                onClick={restart}
+                onClick={() => setStep(1)}
                 style={{
-                  padding: "13px 20px",
-                  borderRadius: 12,
-                  border: "1.5px solid #2a2a3d",
-                  background: "transparent",
-                  color: "#a0a0b8",
-                  fontFamily: "'DM Sans', sans-serif",
-                  fontSize: 14,
+                  padding: "16px 24px",
+                  borderRadius: 14,
+                  border: "2px solid #f1f5f9",
+                  background: "#fff",
+                  color: "#64748b",
+                  fontWeight: 600,
                   cursor: "pointer",
-                  transition: "border-color 0.2s",
                 }}
               >
-                ← Back
+                Back
               </button>
             </div>
           </Card>
@@ -507,119 +481,90 @@ export default function MindMapGenerator() {
         {/* ── STEP 3: Mindmap ── */}
         {step === 3 && (
           <Card>
-            <CardLabel>Step 03 — Your Mindmap</CardLabel>
-
-            {/* Topic pill */}
-            {(selected || customTopic) && (
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8,
-                background: "rgba(56,189,248,0.1)", border: "1px solid #38bdf840",
-                borderRadius: 100, padding: "6px 14px", marginBottom: 20,
-                fontFamily: "'Space Mono', monospace", fontSize: 12, color: "#38bdf8",
-              }}>
-                🧠 {selected || customTopic}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Workflow size={20} color="#4f46e5" />
+                <span style={{ fontWeight: 700, fontSize: '15px', color: '#0f172a' }}>Step 03 — Visualization</span>
               </div>
-            )}
+              <div style={{
+                background: "#eef2ff", padding: "6px 14px", borderRadius: "100px",
+                fontSize: 12, color: "#4f46e5", fontWeight: 700
+              }}>
+                Topic: {selected || customTopic}
+              </div>
+            </div>
 
             {loading && <Spinner />}
 
-            {/* Mermaid output */}
             {mermaidSvg && (
               <div
                 ref={mermaidRef}
                 style={{
                   background: "#fff",
-                  borderRadius: 14,
-                  padding: 24,
+                  border: '1px solid #f1f5f9',
+                  borderRadius: 20,
+                  padding: 32,
                   overflow: "auto",
-                  minHeight: 300,
+                  minHeight: 400,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  animation: "fadeUp 0.5s ease forwards",
+                  animation: "fadeUp 0.6s ease forwards",
+                  boxShadow: 'inset 0 0 40px rgba(0,0,0,0.01)'
                 }}
                 dangerouslySetInnerHTML={{ __html: mermaidSvg }}
               />
             )}
 
-            <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+            <div style={{ display: "flex", flexWrap: 'wrap', gap: 12, marginTop: 32 }}>
               <button
                 onClick={restart}
                 style={{
-                  padding: "13px 20px", borderRadius: 12,
-                  border: "1.5px solid #2a2a3d", background: "transparent",
-                  color: "#a0a0b8", fontFamily: "'DM Sans', sans-serif",
-                  fontSize: 14, cursor: "pointer",
+                  flex: 1, padding: "14px", borderRadius: 12,
+                  border: "2px solid #f1f5f9", background: "#fff",
+                  color: "#64748b", fontWeight: 600, cursor: "pointer",
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
                 }}
               >
-                ← Start Over
+                <RotateCcw size={18} /> New Session
               </button>
               {mermaidSvg && (
                 <button
                   onClick={downloadSVG}
                   style={{
-                    padding: "13px 22px", borderRadius: 12,
-                    border: "1.5px solid #38bdf860", background: "rgba(56,189,248,0.08)",
-                    color: "#38bdf8", fontFamily: "'DM Sans', sans-serif",
-                    fontWeight: 600, fontSize: 14, cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 6,
+                    flex: 1, padding: "14px", borderRadius: 12,
+                    border: "none", background: "#4f46e5",
+                    color: "#fff", fontWeight: 700, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: 'center', gap: 8
                   }}
                 >
-                  ⬇ Download SVG
+                  <Download size={18} /> Download SVG
                 </button>
               )}
-              <button
-                onClick={() => { setStep(2); setMermaidSvg(""); setMermaidCode(""); }}
-                style={{
-                  padding: "13px 22px", borderRadius: 12,
-                  border: "1.5px solid #818cf860", background: "rgba(129,140,248,0.08)",
-                  color: "#818cf8", fontFamily: "'DM Sans', sans-serif",
-                  fontWeight: 600, fontSize: 14, cursor: "pointer",
-                }}
-              >
-                ↺ Change Topic
-              </button>
             </div>
           </Card>
         )}
 
-        {/* Raw Mermaid Code (collapsed) */}
-        {mermaidCode && step === 3 && (
-          <details style={{ marginTop: 4 }}>
-            <summary style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: "#6b6b85",
-              cursor: "pointer", userSelect: "none", letterSpacing: 1,
-            }}>
-              View raw Mermaid code
-            </summary>
-            <pre style={{
-              background: "#0e0e18", border: "1px solid #1e1e2e", borderRadius: 12,
-              padding: 20, marginTop: 10, fontSize: 12, color: "#a0a0b8",
-              fontFamily: "'Space Mono', monospace", overflowX: "auto",
-              lineHeight: 1.6,
-            }}>
-              {mermaidCode}
-            </pre>
-          </details>
-        )}
       </div>
 
       {/* Toast */}
       {toast && (
         <div style={{
-          position: "fixed", bottom: 28, right: 28,
-          background: "#13131e",
-          border: `1px solid ${toast.type === "error" ? "#f87171" : toast.type === "success" ? "#34d399" : "#38bdf8"}`,
-          color: toast.type === "error" ? "#f87171" : toast.type === "success" ? "#34d399" : "#38bdf8",
-          borderRadius: 12, padding: "13px 20px",
-          fontFamily: "'Space Mono', monospace", fontSize: 12,
+          position: "fixed", bottom: 32, right: 32,
+          background: "#fff",
+          border: `1px solid ${toast.type === "error" ? "#ef4444" : "#4f46e5"}`,
+          color: toast.type === "error" ? "#ef4444" : "#4f46e5",
+          borderRadius: 16, padding: "16px 24px",
+          fontWeight: 600, fontSize: 14,
           animation: "toastIn 0.3s ease",
-          zIndex: 999, maxWidth: 320, lineHeight: 1.5,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          zIndex: 999, maxWidth: 350,
+          boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+          display: 'flex', alignItems: 'center', gap: 12
         }}>
+          {toast.type === "success" ? <CheckCircle2 size={20} /> : <Workflow size={20} />}
           {toast.msg}
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -1,63 +1,39 @@
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-import torch
+import os
+from groq import Groq
+from dotenv import load_dotenv
 
-MODEL_NAME = "sshleifer/distilbart-cnn-12-6"
-
-# tokenizer + model load
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
+load_dotenv()
 
 def summarize_text(text: str) -> str:
-    inputs = tokenizer(
-        text,
-        return_tensors="pt",
-        truncation=True,
-        max_length=1024
-    )
+    """
+    Summarizes text using Groq LLM (llama-3.3-70b-versatile).
+    Much faster and more accurate than local transformer models.
+    """
+    try:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            return "Error: GROQ_API_KEY missing in .env"
 
-    # summary_ids = model.generate(
-    #     inputs["input_ids"],
-    #     attention_mask=inputs["attention_mask"],
-    # max_length=180,
-    # min_length=60,
-    # num_beams=6,
-    # length_penalty=1.5,
-    # no_repeat_ngram_size=3,
-    # early_stopping=True
-    #     # max_length=150,
-    #     # min_length=40,
-    #     # num_beams=4,
-    #     # length_penalty=2.0,
-    #     # early_stopping=True
-    # )
+        client = Groq(api_key=api_key)
 
-    summary_ids = model.generate(
-    input_ids=inputs["input_ids"],
-    attention_mask=inputs["attention_mask"],
+        prompt = (
+            "You are a professional educational summarizer. "
+            "Summarize the following document into a concise study summary. "
+            "Maintain high accuracy and keep it structured with key points if necessary. "
+            "Language: Professional English.\n\n"
+            f"Document:\n{text[:6000]}" # Limit input for safety
+        )
 
-    # 📏 Length control (badi + detailed summary)
-    max_length=280,
-    min_length=120,
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=1024,
+        )
 
-    # 🎯 Quality control
-    num_beams=8,
-    length_penalty=1.2,
+        return completion.choices[0].message.content.strip()
 
-    # 🔁 Repetition control
-    no_repeat_ngram_size=3,
-    repetition_penalty=1.2,
-    encoder_no_repeat_ngram_size=3,
-
-    # 🧠 Better stopping
-    early_stopping=False,
-
-    # 🧪 Stable & deterministic output
-    do_sample=False
-)
-
-    summary = tokenizer.decode(
-        summary_ids[0],
-        skip_special_tokens=True
-    )
-
-    return summary
+    except Exception as e:
+        print(f"[Summarizer Error] {e}")
+        # Return a simple truncated fallback if LLM fails
+        return text[:800] + "..."

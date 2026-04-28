@@ -1,60 +1,78 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import {
+  MessageSquare,
+  Send,
+  Paperclip,
+  ChevronLeft,
+  FileText,
+  Check,
+  MoreVertical,
+  User,
+  Bot,
+  Sparkles,
+  LayoutGrid,
+  X,
+  History,
+  Plus,
+  BrainCircuit,
+  Cpu
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const CHAT_API = "http://127.0.0.1:8000/chat";
-const SUMMARIZE_API = "http://127.0.0.1:8000/summarize";
+const CHAT_API = "http://127.0.0.1:8000/api/chat";
+const CONTEXT_UPLOAD_API = "http://127.0.0.1:8000/api/chat/context-upload";
 
-const fmt = (d) =>
-  new Date(d).toLocaleString("en-IN", { day:"2-digit", month:"short", hour:"2-digit", minute:"2-digit" });
-const trunc = (s, n=50) => s.length > n ? s.slice(0,n)+"…" : s;
+const formatTime = (ts: number) =>
+  new Date(ts).toLocaleString("en-IN", { hour: "2-digit", minute: "2-digit" });
+
+const truncate = (s: string, n = 40) => s.length > n ? s.slice(0, n) + "…" : s;
 
 export default function ChatbotPage() {
   const navigate = useNavigate();
   const [messages, setMessages] = useState([
-    { role:"assistant", text:"Namaste! 👋 Koi bhi document upload karo ya left sidebar se summary select karo — main usi context se jawab dunga.", ts:Date.now() }
+    { role: "assistant", text: "Hello! I'm your AI context assistant. Upload a document or select one from the sidebar, and I'll answer questions specifically based on that content.", ts: Date.now() }
   ]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [sources, setSources] = useState([]);                  // all uploaded summaries
-  const [activeSourceIds, setActiveSourceIds] = useState(new Set()); // selected for context
+  const [sources, setSources] = useState<any[]>([]);
+  const [activeSourceIds, setActiveSourceIds] = useState(new Set<string>());
 
-  const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, sending]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
 
-  /* ── Upload → /summarize → store as source ── */
-  const handleUpload = async (file) => {
+  const handleUpload = async (file: File) => {
     if (!file) return;
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append("file", file);                                 // backend expects "file" field
-      const res = await fetch(SUMMARIZE_API, { method:"POST", body:fd });
+      fd.append("file", file);
+      const res = await fetch(CONTEXT_UPLOAD_API, { method: "POST", body: fd });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
 
       const raw = data.summary || data.text || "";
-      const lines = raw.trim().split("\n").filter(l => l.trim());
       let title = file.name.replace(/\.[^.]+$/, "");
-      const first = lines[0]?.replace(/^#+\s*/,"").replace(/\*+/g,"").trim();
-      if (first && first.length < 80 && !first.endsWith(".")) title = first;
 
-      const entry = { id: Date.now().toString(), title, fileName:file.name, summary:raw, date:Date.now() };
+      const entry = { id: Date.now().toString(), title, fileName: file.name, summary: raw, date: Date.now() };
       setSources(p => [entry, ...p]);
-      setActiveSourceIds(p => new Set([...p, entry.id]));     // auto-activate
+      setActiveSourceIds(p => new Set([...p, entry.id]));
       setMessages(p => [...p, {
-        role:"assistant",
-        text:`✅ "${entry.title}" upload ho gaya! Ab iske baare mein kuch bhi pucho.`,
-        ts:Date.now()
+        role: "assistant",
+        text: `Successfully analyzed "${entry.title}". I'm now grounded in this context!`,
+        ts: Date.now()
       }]);
-    } catch (err) {
-      setMessages(p => [...p, { role:"assistant", text:`❌ Upload failed: ${err.message}`, ts:Date.now() }]);
+    } catch (err: any) {
+      setMessages(p => [...p, { role: "assistant", text: `Upload error: ${err.message}`, ts: Date.now() }]);
     } finally { setUploading(false); }
   };
 
-  const toggleSource = (id) => {
+  const toggleSource = (id: string) => {
     setActiveSourceIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -62,296 +80,318 @@ export default function ChatbotPage() {
     });
   };
 
-  /* ── Build context from selected sources ── */
   const buildContext = () => {
     const selected = sources.filter(s => activeSourceIds.has(s.id));
-    if (!selected.length) return "No document context. Answer generally.";
-    return selected.map(s => `=== ${s.title} ===\n${s.summary}`).join("\n\n");
+    if (!selected.length) return "";
+    return selected
+      .slice(0, 3)
+      .map(s => `=== DOCUMENT CONTENT: ${s.title} ===\n${s.summary}`)
+      .join("\n\n");
   };
 
-  /* ── Send to /chat with context ── */
   const sendMessage = async () => {
     const text = input.trim();
     if (!text || sending) return;
-    setMessages(p => [...p, { role:"user", text, ts:Date.now() }]);
+    setMessages(p => [...p, { role: "user", text, ts: Date.now() }]);
     setInput("");
     setSending(true);
-    if (textareaRef.current) textareaRef.current.style.height = "44px";
+    if (textareaRef.current) textareaRef.current.style.height = "48px";
     try {
       const res = await fetch(CHAT_API, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json", accept:"application/json" },
-        // backend expects: { message: string, context: string }
-        body:JSON.stringify({ message:text, context:buildContext() }),
+        method: "POST",
+        headers: { "Content-Type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ message: text, context: buildContext() }),
       });
-      if (!res.ok) throw new Error(`Server ${res.status}`);
+      if (!res.ok) throw new Error(`Server error (${res.status})`);
       const data = await res.json();
-      // accepts reply / answer / response / text
-      const reply = data.reply || data.answer || data.response || data.text || JSON.stringify(data);
-      setMessages(p => [...p, { role:"assistant", text:reply, ts:Date.now() }]);
-    } catch (err) {
+      const reply = data.reply || data.answer || data.response || data.text;
+      setMessages(p => [...p, { role: "assistant", text: reply, ts: Date.now() }]);
+    } catch (err: any) {
       setMessages(p => [...p, {
-        role:"assistant",
-        text:`❌ Error: ${err.message}. Backend check karo: http://127.0.0.1:8000/chat`,
-        ts:Date.now()
+        role: "assistant",
+        text: `Sorry, I encountered an error: ${err.message}. Please check your backend connection.`,
+        ts: Date.now()
       }]);
     } finally { setSending(false); }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   };
 
-  const handleTextareaChange = (e) => {
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    e.target.style.height = "44px";
-    e.target.style.height = Math.min(e.target.scrollHeight, 140) + "px";
+    e.target.style.height = "48px";
+    e.target.style.height = Math.min(e.target.scrollHeight, 180) + "px";
   };
-
-  const activeCount = activeSourceIds.size;
 
   return (
-    <>
+    <div style={{ background: '#80a4ffff', height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", overflow: 'hidden' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap');
-        @keyframes fadeup{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-        @keyframes bounce{0%,80%,100%{transform:translateY(0);}40%{transform:translateY(-6px);}}
-        @keyframes spin{to{transform:rotate(360deg);}}
-        @keyframes pdot{0%,100%{transform:scale(1);}50%{transform:scale(1.5);opacity:0.6;}}
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        body{background:#06030f;overflow:hidden;}
-        textarea{resize:none;font-family:'DM Sans',sans-serif;}
-        textarea:focus{outline:none;}
-        ::-webkit-scrollbar{width:3px;}
-        ::-webkit-scrollbar-thumb{background:rgba(124,58,237,0.25);border-radius:3px;}
+                @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+                ::-webkit-scrollbar { width: 6px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+                ::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+                textarea { resize: none; outline: none; transition: border-color 0.2s; }
+            `}</style>
 
-        .cb-root{font-family:'DM Sans',sans-serif;background:#06030f;height:100vh;display:flex;flex-direction:column;overflow:hidden;color:#e9d5ff;position:relative;}
-        .cb-orb1{position:fixed;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(91,33,182,0.1),transparent 70%);filter:blur(80px);top:-150px;right:-150px;pointer-events:none;z-index:0;}
-        .cb-orb2{position:fixed;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,0.07),transparent 70%);filter:blur(80px);bottom:0;left:20%;pointer-events:none;z-index:0;}
-        .cb-grid{position:fixed;inset:0;background-image:linear-gradient(rgba(124,58,237,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(124,58,237,0.02) 1px,transparent 1px);background-size:48px 48px;pointer-events:none;z-index:0;}
-        /* Nav */
-        .cb-nav{display:flex;align-items:center;justify-content:space-between;padding:13px 28px;background:rgba(6,3,15,0.92);border-bottom:1px solid rgba(124,58,237,0.14);backdrop-filter:blur(20px);z-index:20;flex-shrink:0;position:relative;}
-        .cb-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1rem;background:linear-gradient(135deg,#c084fc,#f0abfc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:flex;align-items:center;gap:8px;cursor:pointer;}
-        .cb-logo-dot{width:7px;height:7px;background:#7c3aed;border-radius:50%;box-shadow:0 0 10px #7c3aed;-webkit-text-fill-color:initial;animation:pdot 2s ease-in-out infinite;flex-shrink:0;}
-        .cb-nav-badge{font-size:0.62rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;padding:3px 10px;border-radius:100px;background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.3);color:#c084fc;}
-        .cb-back{padding:7px 16px;background:transparent;border:1px solid rgba(168,85,247,0.22);border-radius:8px;color:rgba(233,213,255,0.55);font-size:0.8rem;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;}
-        .cb-back:hover{background:rgba(45,22,114,0.35);border-color:rgba(168,85,247,0.45);color:#e9d5ff;}
-        /* Body */
-        .cb-body{display:flex;flex:1;overflow:hidden;position:relative;z-index:2;}
-        /* Sidebar */
-        .cb-sidebar{width:270px;flex-shrink:0;background:rgba(10,5,26,0.97);border-right:1px solid rgba(91,33,182,0.16);display:flex;flex-direction:column;overflow:hidden;}
-        .cb-sidebar-top{padding:14px 14px 10px;border-bottom:1px solid rgba(91,33,182,0.12);flex-shrink:0;}
-        .cb-upload-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;background:linear-gradient(135deg,rgba(124,58,237,0.22),rgba(168,85,247,0.08));border:1px dashed rgba(124,58,237,0.32);border-radius:12px;color:#c084fc;font-size:0.82rem;font-weight:500;cursor:pointer;transition:all .25s;font-family:'DM Sans',sans-serif;}
-        .cb-upload-btn:hover{background:linear-gradient(135deg,rgba(124,58,237,0.35),rgba(168,85,247,0.15));border-style:solid;}
-        .cb-mini-spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(192,132,252,0.2);border-top-color:#c084fc;animation:spin 0.8s linear infinite;}
-        .cb-sidebar-lbl{padding:12px 14px 8px;font-size:0.68rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:rgba(192,132,252,0.4);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
-        .cb-active-count{font-size:0.62rem;padding:2px 8px;border-radius:100px;background:rgba(124,58,237,0.22);border:1px solid rgba(124,58,237,0.3);color:#c084fc;}
-        .cb-sources-list{flex:1;overflow-y:auto;padding:0 10px 10px;}
-        .cb-sources-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 16px;gap:10px;}
-        .cb-source-card{padding:11px;border-radius:12px;cursor:pointer;border:1px solid transparent;transition:all .22s;margin-bottom:6px;position:relative;overflow:hidden;background:rgba(13,7,32,0.4);}
-        .cb-source-card:hover{background:rgba(45,22,114,0.2);border-color:rgba(91,33,182,0.18);}
-        .cb-source-card.active{background:rgba(45,22,114,0.32);border-color:rgba(124,58,237,0.32);box-shadow:0 0 16px rgba(91,33,182,0.1);}
-        .cb-source-bar{position:absolute;left:0;top:15%;bottom:15%;width:2.5px;border-radius:2px;background:linear-gradient(180deg,#7c3aed,#a855f7);}
-        .cb-check{width:16px;height:16px;border-radius:4px;border:1.5px solid rgba(124,58,237,0.25);background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;margin-left:auto;}
-        .cb-check.on{background:#7c3aed;border-color:#7c3aed;}
-        .cb-ctx-hint{margin:0 10px 12px;padding:10px 12px;background:rgba(45,22,114,0.14);border:1px solid rgba(91,33,182,0.13);border-radius:10px;display:flex;gap:8px;align-items:flex-start;flex-shrink:0;}
-        /* Chat */
-        .cb-chat-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
-        .cb-messages{flex:1;overflow-y:auto;padding:24px 28px;}
-        .cb-msg{display:flex;flex-direction:column;margin-bottom:16px;animation:fadeup .3s ease;}
-        .cb-msg.user{align-items:flex-end;} .cb-msg.assistant{align-items:flex-start;}
-        .cb-bubble-row{display:flex;align-items:flex-end;gap:8px;}
-        .cb-msg.user .cb-bubble-row{flex-direction:row-reverse;}
-        .cb-avatar{width:30px;height:30px;border-radius:50%;flex-shrink:0;border:1px solid rgba(124,58,237,0.35);display:flex;align-items:center;justify-content:center;font-size:12px;}
-        .cb-bubble{max-width:72%;padding:12px 16px;}
-        .cb-bubble.user{border-radius:18px 4px 18px 18px;background:linear-gradient(135deg,#7c3aed,#a855f7);box-shadow:0 4px 20px rgba(124,58,237,0.3);}
-        .cb-bubble.assistant{border-radius:4px 18px 18px 18px;background:rgba(13,7,32,0.85);border:1px solid rgba(91,33,182,0.22);box-shadow:0 2px 12px rgba(0,0,0,0.3);backdrop-filter:blur(10px);}
-        .cb-bubble p{font-size:0.875rem;line-height:1.65;margin:0;white-space:pre-wrap;word-break:break-word;}
-        .cb-bubble.user p{color:rgba(255,255,255,0.95);} .cb-bubble.assistant p{color:rgba(233,213,255,0.82);}
-        .cb-ts{font-size:0.62rem;color:rgba(233,213,255,0.2);margin-top:4px;}
-        /* Typing dots */
-        .cb-typing{display:flex;align-items:flex-end;gap:8px;margin-bottom:16px;}
-        .cb-typing-bubble{padding:14px 18px;background:rgba(13,7,32,0.85);border:1px solid rgba(91,33,182,0.22);border-radius:4px 18px 18px 18px;backdrop-filter:blur(10px);display:flex;gap:5px;align-items:center;}
-        .cb-dot{width:7px;height:7px;border-radius:50%;background:#7c3aed;}
-        .cb-dot:nth-child(1){animation:bounce 1.2s ease-in-out 0s infinite;}
-        .cb-dot:nth-child(2){animation:bounce 1.2s ease-in-out 0.2s infinite;}
-        .cb-dot:nth-child(3){animation:bounce 1.2s ease-in-out 0.4s infinite;}
-        /* Input */
-        .cb-input-bar{padding:12px 20px 14px;background:rgba(6,3,15,0.9);border-top:1px solid rgba(91,33,182,0.14);backdrop-filter:blur(20px);flex-shrink:0;}
-        .cb-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
-        .cb-chip{display:flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(45,22,114,0.35);border:1px solid rgba(124,58,237,0.28);border-radius:100px;}
-        .cb-input-row{display:flex;gap:10px;align-items:flex-end;background:rgba(13,7,32,0.7);border:1px solid rgba(91,33,22,0.22);border-radius:16px;padding:8px 8px 8px 14px;backdrop-filter:blur(10px);}
-        .cb-attach{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:rgba(45,22,114,0.3);border:1px solid rgba(124,58,237,0.22);display:flex;align-items:center;justify-content:center;color:rgba(192,132,252,0.6);cursor:pointer;transition:all 0.2s;margin-bottom:2px;}
-        .cb-attach:hover{background:rgba(45,22,114,0.5);border-color:rgba(124,58,237,0.45);color:#c084fc;}
-        .cb-textarea{flex:1;background:transparent;border:none;color:#e9d5ff;font-size:0.9rem;line-height:1.6;height:44px;max-height:140px;overflow-y:auto;}
-        .cb-send{width:40px;height:40px;border-radius:12px;flex-shrink:0;background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(124,58,237,0.35);transition:all 0.2s;margin-bottom:2px;}
-        .cb-send:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 0 32px rgba(168,85,247,0.45);}
-        .cb-send:disabled{opacity:0.4;cursor:not-allowed;}
-        .cb-hint{font-size:0.65rem;color:rgba(233,213,255,0.2);text-align:center;margin-top:6px;}
-      `}</style>
+      {/* Soothing Background Aesthetics */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
+        {/* Main gradient mesh */}
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(at 0% 0%, #f0f4ff 0%, transparent 50%), radial-gradient(at 100% 0%, #f5f3ff 0%, transparent 50%), radial-gradient(at 100% 100%, #eff6ff 0%, transparent 50%), radial-gradient(at 0% 100%, #fdf4ff 0%, transparent 50%)' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(79,70,229,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(79,70,229,0.03) 1px,transparent 1px)', backgroundSize: '40px 40px' }} />
 
-      <div className="cb-root">
-        <div className="cb-orb1"/><div className="cb-orb2"/><div className="cb-grid"/>
+        <motion.div animate={{ x: [0, 60, 0], y: [0, 40, 0], scale: [1, 1.1, 1] }} transition={{ duration: 25, repeat: Infinity, ease: "linear" }} style={{ position: 'absolute', width: 700, height: 700, background: 'radial-gradient(circle, rgba(99,102,241,0.08), transparent 70%)', filter: 'blur(100px)', top: '-15%', right: '-5%', borderRadius: '50%' }} />
+        <motion.div animate={{ x: [0, -50, 0], y: [0, -60, 0], scale: [1, 1.2, 1] }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} style={{ position: 'absolute', width: 600, height: 600, background: 'radial-gradient(circle, rgba(168,85,247,0.07), transparent 70%)', filter: 'blur(100px)', bottom: '5%', left: '-10%', borderRadius: '50%' }} />
+        <motion.div animate={{ opacity: [0.3, 0.6, 0.3] }} transition={{ duration: 10, repeat: Infinity }} style={{ position: 'absolute', width: 400, height: 400, background: 'radial-gradient(circle, rgba(56,189,248,0.06), transparent 70%)', filter: 'blur(80px)', top: '30%', left: '30%', borderRadius: '50%' }} />
+      </div>
 
-        {/* Nav */}
-        <nav className="cb-nav">
-          <div className="cb-logo" onClick={() => navigate("/")}><div className="cb-logo-dot"/>AI-LLM Notebook</div>
-          <div style={{display:"flex",alignItems:"center",gap:10,color:"#e9d5ff"}}>
-            <span>🤖</span>
-            <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:"0.95rem"}}>AI Chatbot</span>
-            <span className="cb-nav-badge">Context-Aware</span>
+      {/* Navbar */}
+      <nav style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 40px', background: 'rgba(255,255,255,0.7)',
+        borderBottom: '1px solid #E5E7EB', backdropFilter: 'blur(20px)', position: 'relative', zIndex: 100
+      }}>
+        <div onClick={() => navigate("/dashboard")} style={{ fontSize: '1.2rem', fontWeight: 800, color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+          <div style={{ width: 8, height: 8, background: '#4F46E5', borderRadius: '50%', boxShadow: '0 0 12px #4F46E5' }} />
+          CortexCraft
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#EEF2FF', padding: '6px 16px', borderRadius: 100, border: '1px solid #C7D2FE' }}>
+          <MessageSquare size={16} color="#4F46E5" />
+          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#4F46E5', letterSpacing: '0.02em' }}>BRAIN CHAT</span>
+        </div>
+        <button
+          onClick={() => navigate("/dashboard")}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', background: '#FFF', border: '1px solid #E5E7EB', borderRadius: 100, color: '#4B5563', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', transition: '0.2s' }}
+          onMouseOver={e => { e.currentTarget.style.background = '#F9FAFB'; e.currentTarget.style.borderColor = '#4F46E5'; e.currentTarget.style.color = '#4F46E5'; }}
+          onMouseOut={e => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#4B5563'; }}
+        >
+          <ChevronLeft size={18} /> Exit
+        </button>
+      </nav>
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative', zIndex: 10 }}>
+
+        {/* Sidebar */}
+        <aside style={{ width: 320, background: 'rgba(255,255,255,0.4)', borderRight: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          <div style={{ padding: '24px' }}>
+            <button
+              onClick={() => document.getElementById('chat-upload')?.click()}
+              disabled={uploading}
+              style={{
+                width: '100%', padding: '12px', background: '#4F46E5', color: '#FFF',
+                border: 'none', borderRadius: 12, fontSize: '0.9rem', fontWeight: 700,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                cursor: 'pointer', boxShadow: '0 8px 20px rgba(79, 70, 229, 0.25)', transition: '0.3s'
+              }}
+              onMouseOver={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+            >
+              {uploading ? (
+                <div style={{ width: 18, height: 18, border: '2px solid #FFF', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
+              ) : (
+                <Plus size={18} />
+              )}
+              New Source
+            </button>
+            <input id="chat-upload" type="file" style={{ display: 'none' }} onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
           </div>
-          <button className="cb-back" onClick={() => navigate("/dashboard")}>← Dashboard</button>
-        </nav>
 
-        <div className="cb-body">
+          <div style={{ padding: '0 24px 12px', fontSize: '0.75rem', fontWeight: 800, color: '#94A3B8', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <History size={14} /> CONTEXT SOURCES
+          </div>
 
-          {/* ── SIDEBAR ── */}
-          <aside className="cb-sidebar">
-            <div className="cb-sidebar-top">
-              <label className="cb-upload-btn" style={uploading?{opacity:0.6,cursor:"not-allowed"}:{}}>
-                {uploading ? <><div className="cb-mini-spin"/>Uploading…</> : <><span>📎</span>Upload Document</>}
-                <input type="file" style={{display:"none"}} accept=".pdf,.txt,.docx,.png,.jpg,.jpeg,.webp"
-                  disabled={uploading}
-                  onChange={e=>{if(e.target.files[0])handleUpload(e.target.files[0]);e.target.value="";}}
-                />
-              </label>
-            </div>
-
-            <div className="cb-sidebar-lbl">
-              <span>✦ Context Sources</span>
-              {activeCount>0 && <span className="cb-active-count">{activeCount} active</span>}
-            </div>
-
-            <div className="cb-sources-list">
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 12px 24px' }}>
+            <AnimatePresence>
               {sources.length === 0 ? (
-                <div className="cb-sources-empty">
-                  <div style={{fontSize:"2rem",opacity:0.2}}>📂</div>
-                  <p style={{fontSize:"0.75rem",color:"rgba(233,213,255,0.22)",lineHeight:1.6,textAlign:"center"}}>
-                    Document upload karo — summary automatically context mein add ho jaayegi.
-                  </p>
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94A3B8' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: 16 }}>📁</div>
+                  <p style={{ fontSize: '0.85rem', fontWeight: 500 }}>No documents uploaded yet.</p>
                 </div>
-              ) : sources.map(src => {
-                const isActive = activeSourceIds.has(src.id);
-                return (
-                  <div key={src.id} className={`cb-source-card ${isActive?"active":""}`} onClick={()=>toggleSource(src.id)}>
-                    {isActive && <div className="cb-source-bar"/>}
-                    <div style={{position:"relative",zIndex:1}}>
-                      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
-                        <span>{src.fileName.endsWith(".pdf")?"📕":src.fileName.match(/\.(png|jpg|jpeg|webp)$/i)?"🖼️":"📄"}</span>
-                        <span style={{fontSize:"0.6rem",fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",color:isActive?"#c084fc":"rgba(192,132,252,0.38)"}}>
-                          {src.fileName.split(".").pop().toUpperCase()}
-                        </span>
-                        <div className={`cb-check ${isActive?"on":""}`}>
-                          {isActive && <span style={{color:"white",fontSize:10,lineHeight:1}}>✓</span>}
-                        </div>
+              ) : (
+                sources.map((src, i) => (
+                  <motion.div
+                    key={src.id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    onClick={() => toggleSource(src.id)}
+                    style={{
+                      padding: '16px', borderRadius: 16, cursor: 'pointer',
+                      background: activeSourceIds.has(src.id) ? '#FFF' : 'transparent',
+                      border: '1px solid',
+                      borderColor: activeSourceIds.has(src.id) ? '#4F46E580' : 'transparent',
+                      boxShadow: activeSourceIds.has(src.id) ? '0 10px 20px rgba(0,0,0,0.04)' : 'none',
+                      transition: '0.2s', marginBottom: 8, position: 'relative'
+                    }}
+                    onMouseOver={e => !activeSourceIds.has(src.id) && (e.currentTarget.style.background = '#F1F5F9')}
+                    onMouseOut={e => !activeSourceIds.has(src.id) && (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: activeSourceIds.has(src.id) ? '#EEF2FF' : '#F8FAFC', color: activeSourceIds.has(src.id) ? '#4F46E5' : '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileText size={16} />
                       </div>
-                      <div style={{fontFamily:"'Syne',sans-serif",fontSize:"0.78rem",fontWeight:700,color:isActive?"#f5f3ff":"#e9d5ff",marginBottom:2,lineHeight:1.25,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {trunc(src.title,30)}
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{src.title}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#94A3B8', fontWeight: 500 }}>{src.fileName.split('.').pop()?.toUpperCase()}</div>
                       </div>
-                      <div style={{fontSize:"0.64rem",color:"rgba(233,213,255,0.24)",marginBottom:4}}>{fmt(src.date)}</div>
-                      <div style={{fontSize:"0.7rem",color:"rgba(233,213,255,0.3)",lineHeight:1.45,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden"}}>
-                        {src.summary.replace(/[#*\-•◆]/g," ").replace(/\s+/g," ").trim().slice(0,85)}
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #E2E8F0', background: activeSourceIds.has(src.id) ? '#10B981' : 'transparent', borderColor: activeSourceIds.has(src.id) ? '#10B981' : '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {activeSourceIds.has(src.id) && <Check size={12} color="white" />}
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  </motion.div>
+                ))
+              )}
+            </AnimatePresence>
+          </div>
+
+          {activeSourceIds.size > 0 && (
+            <div style={{ margin: '16px 24px 24px', padding: '16px', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 16, display: 'flex', gap: 10 }}>
+              <BrainCircuit size={16} color="#15803d" style={{ marginTop: 2 }} />
+              <p style={{ fontSize: '0.75rem', color: '#15803d', fontWeight: 600, lineHeight: 1.5 }}>
+                Grounded in <b>{activeSourceIds.size}</b> source{activeSourceIds.size > 1 ? 's' : ''}. Responses are now hyper-accurate.
+              </p>
             </div>
+          )}
 
-            {activeCount > 0 && (
-              <div className="cb-ctx-hint">
-                <span style={{color:"#c084fc",fontSize:"0.7rem"}}>🧠</span>
-                <span style={{fontSize:"0.7rem",color:"rgba(233,213,255,0.32)",lineHeight:1.5}}>
-                  {activeCount} source{activeCount>1?"s":""} context mein hai{activeCount>1?"n":""}. Chatbot isi ke basis pe jawab dega.
-                </span>
-              </div>
-            )}
-          </aside>
+        </aside>
 
-          {/* ── CHAT ── */}
-          <main className="cb-chat-main">
-            <div className="cb-messages">
+        {/* Chat Main Area */}
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '40px 60px' }}>
+            <div style={{ maxWidth: '800px', margin: '0 auto' }}>
               {messages.map((msg, i) => (
-                <div key={i} className={`cb-msg ${msg.role}`}>
-                  <div className="cb-bubble-row">
-                    <div className="cb-avatar" style={{
-                      background:msg.role==="user"?"linear-gradient(135deg,#7c3aed,#a855f7)":"linear-gradient(135deg,#1e0f45,#2d1672)"
-                    }}>{msg.role==="user"?"👤":"🤖"}</div>
-                    <div className={`cb-bubble ${msg.role}`}>
-                      <p>{msg.text.replace(/\*\*(.+?)\*\*/g,"$1")}</p>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
+                    gap: 16,
+                    marginBottom: 32,
+                    alignItems: 'flex-start'
+                  }}
+                >
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 14,
+                    background: msg.role === 'user' ? '#4F46E5' : '#FFF',
+                    border: msg.role === 'user' ? 'none' : '1px solid #E5E7EB',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: msg.role === 'user' ? '0 8px 16px rgba(79, 70, 229, 0.2)' : '0 4px 10px rgba(0,0,0,0.03)',
+                    flexShrink: 0
+                  }}>
+                    {msg.role === 'user' ? <User size={20} color="white" /> : <Bot size={20} color="#4F46E5" />}
+                  </div>
+                  <div style={{ maxWidth: '75%' }}>
+                    <div style={{
+                      padding: '16px 20px',
+                      borderRadius: 20,
+                      background: msg.role === 'user' ? '#FFF' : '#FFF',
+                      border: '1px solid #E5E7EB',
+                      boxShadow: '0 10px 30px -10px rgba(0,0,0,0.05)',
+                      borderBottomRightRadius: msg.role === 'user' ? 4 : 20,
+                      borderBottomLeftRadius: msg.role === 'assistant' ? 4 : 20,
+                    }}>
+                      <p style={{
+                        fontSize: '0.95rem', color: '#334155', lineHeight: 1.7, margin: 0,
+                        fontWeight: msg.role === 'user' ? 600 : 500
+                      }}>
+                        {msg.text}
+                      </p>
+                    </div>
+                    <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#94A3B8', marginTop: 8, textAlign: msg.role === 'user' ? 'right' : 'left' }}>
+                      {formatTime(msg.ts)}
                     </div>
                   </div>
-                  {msg.ts && (
-                    <span className="cb-ts" style={{marginLeft:msg.role==="user"?0:38,marginRight:msg.role==="user"?38:0}}>
-                      {fmt(msg.ts)}
-                    </span>
-                  )}
-                </div>
+                </motion.div>
               ))}
 
               {sending && (
-                <div className="cb-typing">
-                  <div className="cb-avatar" style={{width:30,height:30,borderRadius:"50%",background:"linear-gradient(135deg,#1e0f45,#2d1672)",border:"1px solid rgba(124,58,237,0.35)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>🤖</div>
-                  <div className="cb-typing-bubble">
-                    <div className="cb-dot"/><div className="cb-dot"/><div className="cb-dot"/>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 14, background: '#FFF', border: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Bot size={20} color="#4F46E5" />
+                  </div>
+                  <div style={{ padding: '16px 24px', background: '#FFF', border: '1px solid #E5E7EB', borderRadius: '4px 20px 20px 20px', display: 'flex', gap: 6 }}>
+                    {[0, 1, 2].map(d => (
+                      <motion.div key={d} animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 0.8, delay: d * 0.2 }} style={{ width: 6, height: 6, background: '#4F46E5', borderRadius: '50%' }} />
+                    ))}
                   </div>
                 </div>
               )}
-              <div ref={messagesEndRef}/>
+              <div ref={messagesEndRef} />
             </div>
+          </div>
 
-            {/* Input bar */}
-            <div className="cb-input-bar">
-              {activeCount > 0 && (
-                <div className="cb-chips">
-                  <span style={{fontSize:"0.65rem",color:"rgba(192,132,252,0.38)",letterSpacing:"0.08em",textTransform:"uppercase"}}>Context:</span>
-                  {sources.filter(s=>activeSourceIds.has(s.id)).map(s => (
-                    <div key={s.id} className="cb-chip">
-                      <span style={{fontSize:"0.75rem"}}>{s.fileName.endsWith(".pdf")?"📕":"📄"}</span>
-                      <span style={{fontSize:"0.7rem",color:"rgba(233,213,255,0.7)"}}>{trunc(s.title,18)}</span>
-                      <button style={{background:"none",border:"none",color:"rgba(233,213,255,0.38)",cursor:"pointer",fontSize:10,lineHeight:1,padding:"0 2px"}}
-                        onClick={()=>toggleSource(s.id)}>✕</button>
+          {/* Entry Bar */}
+          <div style={{ padding: '24px 60px 40px', background: 'transparent' }}>
+            <div style={{ maxWidth: '800px', margin: '0 auto', position: 'relative' }}>
+
+              {activeSourceIds.size > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12, overflowX: 'auto', paddingBottom: 4 }}>
+                  {sources.filter(s => activeSourceIds.has(s.id)).map(s => (
+                    <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#EEF2FF', border: '1px solid #C7D2FE', padding: '4px 12px', borderRadius: 100, fontSize: '0.75rem', fontWeight: 700, color: '#4F46E5', whiteSpace: 'nowrap' }}>
+                      <Sparkles size={12} /> {truncate(s.title, 20)}
+                      <X size={14} style={{ cursor: 'pointer' }} onClick={() => toggleSource(s.id)} />
                     </div>
                   ))}
                 </div>
               )}
 
-              <div className="cb-input-row">
-                <label className="cb-attach" title="Document attach karo">
-                  <svg width="17" height="17" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
-                  </svg>
-                  <input type="file" style={{display:"none"}} accept=".pdf,.txt,.docx,.png,.jpg,.jpeg,.webp"
-                    onChange={e=>{if(e.target.files[0])handleUpload(e.target.files[0]);e.target.value="";}}
-                  />
-                </label>
+              <div style={{
+                display: 'flex', alignItems: 'flex-end', gap: 12, background: '#FFF',
+                border: '1px solid #E5E7EB', borderRadius: 24, padding: '8px 12px 8px 16px',
+                boxShadow: '0 20px 50px -15px rgba(0,0,0,0.08)', transition: '0.3s'
+              }}
+                id="input-container"
+                onFocus={() => document.getElementById('input-container')!.style.borderColor = '#4F46E5'}
+                onBlur={() => document.getElementById('input-container')!.style.borderColor = '#E5E7EB'}
+              >
+                <button
+                  onClick={() => document.getElementById('chat-upload')?.click()}
+                  style={{ width: 40, height: 40, borderRadius: 14, background: '#F8FAFC', border: '1px solid #E5E7EB', color: '#94A3B8', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', marginBottom: 2 }}
+                >
+                  <Paperclip size={20} />
+                </button>
 
                 <textarea
                   ref={textareaRef}
                   value={input}
                   onChange={handleTextareaChange}
                   onKeyDown={handleKeyDown}
-                  placeholder={activeCount>0 ? `${activeCount} document ke baare mein pucho…` : "Kuch bhi pucho — ya pehle document upload karo…"}
-                  rows={1}
-                  className="cb-textarea"
+                  placeholder={activeSourceIds.size > 0 ? "Ask about your documents..." : "Type a message..."}
+                  style={{
+                    flex: 1, padding: '12px 0', background: 'transparent', border: 'none',
+                    fontSize: '1rem', fontWeight: 500, color: '#1E293B', height: '48px'
+                  }}
                 />
 
-                <button className="cb-send" disabled={!input.trim()||sending} onClick={sendMessage}>
-                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19V6M5 12l7-7 7 7"/>
-                  </svg>
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || sending}
+                  style={{
+                    width: 48, height: 48, borderRadius: 18, background: input.trim() ? '#4F46E5' : '#F1F5F9',
+                    color: '#FFF', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: input.trim() ? 'pointer' : 'default', transition: '0.2s', marginBottom: 2
+                  }}
+                >
+                  <Send size={20} color={input.trim() ? 'white' : '#94A3B8'} />
                 </button>
               </div>
-
-              <div className="cb-hint">
-                Enter = send &nbsp;·&nbsp; Shift+Enter = new line &nbsp;·&nbsp;
-                {activeCount>0 ? `${activeCount} source${activeCount>1?"s":""} active` : "No context — general mode"}
+              <div style={{ textAlign: 'center', marginTop: 12, fontSize: '0.75rem', color: '#94A3B8', fontWeight: 600 }}>
+                {activeSourceIds.size === 0 ? "General Model · No context selected" : `Context Active (${activeSourceIds.size} source${activeSourceIds.size > 1 ? 's' : ''})`}
               </div>
             </div>
-          </main>
-        </div>
+          </div>
+
+        </main>
       </div>
-    </>
+    </div>
   );
 }
