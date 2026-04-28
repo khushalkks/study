@@ -293,4 +293,5 @@ async def upload_file(file: UploadFile = File(...)):
         content = await file.read()
         f.write(content)
         
-    return {"url": f"http://localhost:8000/uploads/{filename}"}
+    base_url = os.getenv("BASE_URL", "http://localhost:8000")
+    return {"url": f"{base_url}/uploads/{filename}"}
