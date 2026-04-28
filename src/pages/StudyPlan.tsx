@@ -3,21 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, 
   Calendar, 
-  Sparkles, 
   Clock, 
-  Target, 
   BookOpen, 
-  CheckCircle2, 
-  ChevronRight, 
   RotateCcw,
+  Sparkles,
   Zap,
   Layout,
-  Star,
   BrainCircuit,
   Lightbulb,
   ShieldCheck
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 type PlanResponse = {
   days_left: number;
@@ -356,7 +352,7 @@ export default function StudyPlan() {
                           {Object.entries(day).filter(([k]) => k !== "day").map(([sub, hrs]) => (
                              <div key={sub} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase' }}>{sub}</span>
-                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>{hrs} hours</span>
+                                <span style={{ fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>{hrs as any} hours</span>
                              </div>
                           ))}
                        </div>

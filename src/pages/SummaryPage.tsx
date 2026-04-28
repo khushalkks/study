@@ -3,31 +3,39 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Archive, FileText, File as FileIcon, Image as ImageIcon, Sparkles, Clock, Paperclip, AlertCircle, Lightbulb } from "lucide-react";
 
-const fmt = (d) =>
+interface SummaryEntry {
+  id: number;
+  title: string;
+  summary: string;
+  fileName: string;
+  date: number;
+}
+
+const fmt = (d: number | string | Date) =>
   new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-const truncate = (str, n = 60) => (str.length > n ? str.slice(0, n) + "…" : str);
+const truncate = (str: string, n: number = 60) => (str.length > n ? str.slice(0, n) + "…" : str);
 
 export default function SummaryPage() {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
-  const dropRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
-  const [file, setFile] = useState(null);
+  const [file, setFile] = useState<File | null>(null);
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [selectedIdx, setSelectedIdx] = useState(null);
+  const [history, setHistory] = useState<SummaryEntry[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [error, setError] = useState("");
 
-  const onDragOver = useCallback((e) => { e.preventDefault(); setDragging(true); }, []);
+  const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragging(true); }, []);
   const onDragLeave = useCallback(() => setDragging(false), []);
-  const onDrop = useCallback((e) => {
+  const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragging(false);
     const f = e.dataTransfer.files[0];
     if (f) pickFile(f);
   }, []);
 
-  const pickFile = (f) => {
+  const pickFile = (f: File) => {
     const allowed = ["application/pdf", "text/plain",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       "image/png", "image/jpeg", "image/webp"];
@@ -55,7 +63,7 @@ export default function SummaryPage() {
       const data = await res.json();
       const rawSummary = data.summary || data.text || data.result || JSON.stringify(data);
 
-      const lines = rawSummary.trim().split("\n").filter(l => l.trim());
+      const lines = rawSummary.trim().split("\n").filter((l: string) => l.trim());
       let title = file.name.replace(/\.[^.]+$/, "");
       let summaryText = rawSummary;
       const firstLine = lines[0]?.replace(/^#+\s*/, "").replace(/\*+/g, "").trim();
@@ -68,9 +76,9 @@ export default function SummaryPage() {
       setHistory(prev => [entry, ...prev]);
       setSelectedIdx(0);
       setFile(null);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || "Summary generate nahi ho saki. Dobara try karein.");
+      setError(err instanceof Error ? err.message : "Summary generate nahi ho saki. Dobara try karein.");
     } finally {
       setLoading(false);
     }
@@ -78,7 +86,7 @@ export default function SummaryPage() {
 
   const displayed = selectedIdx !== null ? history[selectedIdx] : null;
 
-  const renderSummary = (text) => {
+  const renderSummary = (text: string) => {
     if (!text) return null;
     return text.split("\n").map((line, i) => {
       const t = line.trim();
@@ -257,14 +265,14 @@ export default function SummaryPage() {
                 >
                   <div className="sp-hist-icon-row">
                     <span>{item.fileName.endsWith(".pdf") ? <FileIcon size={14} color="#6366F1" /> : item.fileName.match(/\.(png|jpg|jpeg|webp)$/i) ? <ImageIcon size={14} color="#6366F1" /> : <FileText size={14} color="#6366F1" />}</span>
-                    <span className="sp-hist-ext">{item.fileName.split(".").pop().toUpperCase()}</span>
+                    <span className="sp-hist-ext">{(item.fileName.split(".").pop() || "").toUpperCase()}</span>
                     {idx === 0 && <span className="sp-hist-new">New</span>}
                   </div>
                   <div className="sp-hist-name">{truncate(item.title, 36)}</div>
                   <div className="sp-hist-fname">{truncate(item.fileName, 26)}</div>
                   <div className="sp-hist-date">{fmt(item.date)}</div>
                   <div className="sp-hist-preview">
-                    {truncate(item.summary.replace(/[#*\-•◆]/g, " ").replace(/\s+/g, " ").trim(), 88)}
+                    {truncate((item.summary || "").replace(/[#*\-•◆]/g, " ").replace(/\s+/g, " ").trim(), 88)}
                   </div>
                 </div>
               ))}
@@ -311,7 +319,11 @@ export default function SummaryPage() {
                   <input
                     ref={fileInputRef} type="file" style={{ display: "none" }}
                     accept=".pdf,.txt,.docx,.png,.jpg,.jpeg,.webp"
-                    onChange={(e) => { if (e.target.files[0]) pickFile(e.target.files[0]); e.target.value = ""; }}
+                    onChange={(e) => { 
+                      const f = e.target.files?.[0];
+                      if (f) pickFile(f); 
+                      e.target.value = ""; 
+                    }}
                   />
 
                   {file && (
