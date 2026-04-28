@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Archive, FileText, File as FileIcon, Image as ImageIcon, Sparkles, Clock, Paperclip, AlertCircle, Lightbulb } from "lucide-react";
 
+import { API_BASE } from "../api.config";
+
 interface SummaryEntry {
   id: number;
   title: string;
@@ -50,7 +52,7 @@ export default function SummaryPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch("http://127.0.0.1:8000/api/summarize", {
+      const res = await fetch(`${API_BASE}/summarize`, {
         method: "POST",
         body: formData,
       });

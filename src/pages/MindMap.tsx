@@ -20,8 +20,9 @@ interface Toast {
   msg: string;
   type: ToastType;
 }
+import { API_BASE } from "../api.config";
 
-const API = "http://localhost:8000/api";
+const API = API_BASE;
 const ACCEPTED = [".pdf", ".docx", ".txt"];
 
 function formatBytes(bytes: number): string {

@@ -12,6 +12,7 @@ import {
   Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from "framer-motion";
+import { API_BASE } from '../api.config';
 import type { AnalysisData } from '../types/resume.types';
 
 export default function Resume() {
@@ -30,7 +31,7 @@ export default function Resume() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('http://localhost:8000/api/analyze-resume', {
+      const res = await fetch(`${API_BASE}/analyze-resume`, {
         method: 'POST',
         body: formData,
       });

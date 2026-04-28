@@ -14,6 +14,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { API_BASE } from "../api.config";
 
 type PlanResponse = {
   days_left: number;
@@ -51,7 +52,7 @@ export default function StudyPlan() {
     const subjectList = subjects.split(",").map((s) => s.trim()).filter(s => s !== "");
 
     try {
-      const res = await fetch("http://localhost:8000/api/generate-study-plan", {
+      const res = await fetch(`${API_BASE}/generate-study-plan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
