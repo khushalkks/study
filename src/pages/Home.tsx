@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import React, { useEffect, useState } from "react";
+import { clearSession, getUser } from "../auth";
 import {
   GraduationCap,
   Users,
@@ -24,8 +25,7 @@ const Home = () => {
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) setUser(JSON.parse(storedUser));
+    setUser(getUser());
   }, []);
 
   const handleGetStarted = () => {
@@ -34,9 +34,9 @@ const Home = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
+    clearSession();
     setUser(null);
-    window.location.reload();
+    navigate('/');
   };
 
   return (

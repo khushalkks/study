@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { isLoggedIn } from "./auth";
 
 import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
@@ -16,58 +17,41 @@ import QuizResultPage from "./pages/QuizResultPage";
 import StudyPlan from "./pages/StudyPlan";
 import LoginPage from "./pages/LoginPage";
 
-// Protected Route Component
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const user = localStorage.getItem('user');
-  if (!user) {
-    return <Navigate to="/" replace />;
-  }
+// Redirects logged-in users away from login page
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  if (isLoggedIn()) return <Navigate to="/home" replace />;
   return <>{children}</>;
 };
 
-const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('user'));
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setIsAuthenticated(!!localStorage.getItem('user'));
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  return (
-    <Routes>
-      {/* 
-          Entry Point: Login Page 
-          If already authenticated, redirect to /home
-      */}
-      <Route 
-        path="/" 
-        element={isAuthenticated ? <Navigate to="/home" replace /> : <LoginPage />} 
-      />
-      
-      {/* Home Page is now protected and at /home */}
-      <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-
-      {/* Protected Routes */}
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/interview" element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
-      <Route path="/resume" element={<ProtectedRoute><Resume /></ProtectedRoute>} />
-      <Route path="/community" element={<ProtectedRoute><Community /></ProtectedRoute>} />
-      <Route path="/code" element={<ProtectedRoute><CodeCollab /></ProtectedRoute>} />
-      <Route path="/quiz" element={<ProtectedRoute><QuizPage /></ProtectedRoute>} />
-      <Route path="/summary" element={<ProtectedRoute><SummaryPage /></ProtectedRoute>} />
-      <Route path="/mindmap" element={<ProtectedRoute><MindMapGenerator /></ProtectedRoute>} />
-      <Route path="/flashcards" element={<ProtectedRoute><FlashcardGenerator /></ProtectedRoute>} />
-      <Route path="/chatbot" element={<ProtectedRoute><ChatbotPage/></ProtectedRoute>} />
-      <Route path="/quiz/result" element={<ProtectedRoute><QuizResultPage/></ProtectedRoute>} />
-      <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
-
-      {/* Catch-all redirect to root */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+// Blocks unauthenticated users from protected pages
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  if (!isLoggedIn()) return <Navigate to="/" replace />;
+  return <>{children}</>;
 };
 
-export default App;
+const App = () => (
+  <Routes>
+    {/* Public: login/register — redirects to /home if already logged in */}
+    <Route path="/" element={<PublicRoute><LoginPage /></PublicRoute>} />
+
+    {/* Protected routes */}
+    <Route path="/home"       element={<ProtectedRoute><Home /></ProtectedRoute>} />
+    <Route path="/dashboard"  element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/interview"  element={<ProtectedRoute><InterviewPage /></ProtectedRoute>} />
+    <Route path="/resume"     element={<ProtectedRoute><Resume /></ProtectedRoute>} />
+    <Route path="/community"  element={<ProtectedRoute><Community /></ProtectedRoute>} />
+    <Route path="/code"       element={<ProtectedRoute><CodeCollab /></ProtectedRoute>} />
+    <Route path="/quiz"       element={<ProtectedRoute><QuizPage /></ProtectedRoute>} />
+    <Route path="/summary"    element={<ProtectedRoute><SummaryPage /></ProtectedRoute>} />
+    <Route path="/mindmap"    element={<ProtectedRoute><MindMapGenerator /></ProtectedRoute>} />
+    <Route path="/flashcards" element={<ProtectedRoute><FlashcardGenerator /></ProtectedRoute>} />
+    <Route path="/chatbot"    element={<ProtectedRoute><ChatbotPage /></ProtectedRoute>} />
+    <Route path="/quiz/result" element={<ProtectedRoute><QuizResultPage /></ProtectedRoute>} />
+    <Route path="/study-plan" element={<ProtectedRoute><StudyPlan /></ProtectedRoute>} />
+
+    {/* Catch-all */}
+    <Route path="*" element={<Navigate to="/" replace />} />
+  </Routes>
+);
+
+export default App;

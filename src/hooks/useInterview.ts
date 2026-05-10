@@ -2,8 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { InterviewMessage, InterviewState, InterviewResponse } from "../types/interview";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { API_URL } from "../api.config";
 
 export function useInterview() {
   const [messages, setMessages] = useState<InterviewMessage[]>([]);

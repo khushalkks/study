@@ -9,6 +9,7 @@ import os
 load_dotenv()
 
 from routes import resume
+from routes.auth import router as auth_router
 from summarizer_app.interview_routes import router as interview_router
 from routes.community import router as community_router
 from routes.coding import router as coding_router
@@ -38,10 +39,18 @@ fastapi_app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS Configuration (Fixed) ────────────────────────────────────────────────
+# ── CORS Configuration ───────────────────────────────────────────────────────
+# Reads FRONTEND_URL from .env — change to Vercel URL in production
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+allowed_origins = [
+    frontend_url,
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:5173",
+]
 fastapi_app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,6 +62,7 @@ if not os.path.exists("uploads"):
 fastapi_app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # ── REST Routers ──────────────────────────────────────────────────────────────
+fastapi_app.include_router(auth_router)
 fastapi_app.include_router(interview_router)
 fastapi_app.include_router(resume.router,       prefix="/api")
 fastapi_app.include_router(community_router,    prefix="/api")

@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import React, { useEffect, useState } from "react";
+import { clearSession, getUser } from "../auth";
 import { motion, useScroll, useSpring } from "framer-motion";
 import {
   FileText,
@@ -40,8 +41,7 @@ const Dashboard = () => {
   const containerRef = useRef(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) setUser(JSON.parse(storedUser));
+    setUser(getUser());
   }, []);
 
   const { scrollYProgress } = useScroll({
@@ -56,7 +56,7 @@ const Dashboard = () => {
   });
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
+    clearSession();
     navigate('/login');
   };
 

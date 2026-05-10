@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Editor, useMonaco } from '@monaco-editor/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
+import { API_URL, API_BASE } from "../api.config";
+import { getUser } from "../auth";
 import {
   Hash, Code, Users, Sparkles, X, Bot, Play, Terminal,
   ChevronRight, Wifi, WifiOff, Loader2, CheckCircle2, AlertCircle,
@@ -63,7 +65,7 @@ function Lobby({ initialRoom, onJoin }: { initialRoom?: string; onJoin: (room: s
   const [generatedRoom]         = useState(generateRoomId);
   const [joinInput, setJoinIn]  = useState(initialRoom || '');
   const [nameInput, setNameIn]  = useState(() => {
-    try { return JSON.parse(localStorage.getItem('user') || '{}').name || ''; } catch { return ''; }
+    try { return getUser()?.name || ''; } catch { return ''; }
   });
   const [copied, setCopied]     = useState(false);
 
@@ -90,7 +92,8 @@ function Lobby({ initialRoom, onJoin }: { initialRoom?: string; onJoin: (room: s
 
   const handleGo = () => {
     if (!roomToUse) return;
-    onJoin(roomToUse, nameInput.trim() || 'Anonymous');
+    const u = getUser();
+    onJoin(roomToUse, u?.name || nameInput.trim() || 'Anonymous');
   };
 
   return (
@@ -169,19 +172,6 @@ function Lobby({ initialRoom, onJoin }: { initialRoom?: string; onJoin: (room: s
           </div>
         )}
 
-        <div style={{ marginBottom:'24px' }}>
-          <label style={{ fontSize:'11px', color:'#6e7681', letterSpacing:'0.06em', textTransform:'uppercase' }}>
-            Display Name
-          </label>
-          <input value={nameInput} onChange={e => setNameIn(e.target.value)}
-            placeholder="e.g. Keshav" onKeyDown={e => e.key==='Enter' && handleGo()}
-            style={{ width:'100%', marginTop:'6px', background:'#0d1117', border:'1px solid #21262d',
-              borderRadius:'8px', padding:'10px 14px', color:'#e6edf3', fontSize:'14px',
-              outline:'none', fontFamily:'inherit', boxSizing:'border-box', transition:'border-color 0.15s' }}
-            onFocus={e=>e.target.style.borderColor='#58a6ff'}
-            onBlur={e=>e.target.style.borderColor='#21262d'}
-          />
-        </div>
 
         <button onClick={handleGo}
           disabled={tab==='join' && !joinInput.trim()}
@@ -247,7 +237,7 @@ export default function CodeCollab() {
 
   // ─── Create socket ONCE on mount ──────────────────
   useEffect(() => {
-    const socket = io('http://127.0.0.1:8000', {
+    const socket = io(API_URL, {
       transports: ['websocket'],  // skip polling → instant connect
       reconnection: true,
       reconnectionAttempts: 20,
@@ -390,12 +380,9 @@ export default function CodeCollab() {
 
   // ─── Handlers ─────────────────────────────────────
   const handleLobbyJoin = (room: string, name: string) => {
-    let user = { id: 'dev_' + Math.random().toString(36).slice(2, 9), name };
-    try {
-      const stored = JSON.parse(localStorage.getItem('user') || '{}');
-      if (stored.name === name) user = stored;
-    } catch { /**/ }
-    localStorage.setItem('user', JSON.stringify(user));
+    const loggedInUser = getUser();
+    const user = loggedInUser || { id: 'dev_' + Math.random().toString(36).slice(2, 9), name };
+    
     setCurrentUser(user);
     setActiveRoom(room);
     setHasJoined(true);
@@ -436,7 +423,7 @@ export default function CodeCollab() {
     setShowTerminal(true); setOutput([]); setIsExecuting(true);
     addLine(`❯ Running ${LANGUAGES.find(l => l.id===language)?.name ?? language}...`, 'system');
     try {
-      const res  = await fetch('http://127.0.0.1:8000/api/code/execute', {
+      const res  = await fetch(`${API_BASE}/code/execute`, {
         method: 'POST', headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ code, language }),
       });
@@ -453,7 +440,7 @@ export default function CodeCollab() {
   const triggerReview = async () => {
     setShowReview(true); setIsReviewing(true); setReviewResult('');
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/code/review', {
+      const res = await fetch(`${API_BASE}/code/review`, {
         method: 'POST', headers: { 'Content-Type':'application/json' },
         body: JSON.stringify({ code, language }),
       });

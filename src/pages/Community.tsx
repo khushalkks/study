@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import '../index.css';
 import '../community.css';
+import { API_BASE } from "../api.config";
+import { clearSession, getUser } from "../auth";
 import DiscordSettings from '../components/chat/DiscordSettings';
 
 interface Server {
@@ -70,15 +72,13 @@ const Community = () => {
 
     // Load initial user
     useEffect(() => {
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-            setCurrentUser(JSON.parse(storedUser));
-        }
+        const u = getUser();
+        if (u) setCurrentUser(u);
     }, []);
 
     const fetchServers = async () => {
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/community/servers`);
+            const res = await fetch(`${API_BASE}/community/servers`);
             if (res.ok) {
                 const data = await res.json();
                 setServers(data);
@@ -94,7 +94,7 @@ const Community = () => {
     const fetchChannels = useCallback(async () => {
         if (!activeServer) return;
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/community/channels/${activeServer}`);
+            const res = await fetch(`${API_BASE}/community/channels/${activeServer}`);
             if (res.ok) {
                 const data = await res.json();
                 setChannels(data);
@@ -112,7 +112,7 @@ const Community = () => {
     const fetchMessages = useCallback(async () => {
         if (!activeChannel) return;
         try {
-            const res = await fetch(`http://127.0.0.1:8000/api/community/messages/${activeChannel}`);
+            const res = await fetch(`${API_BASE}/community/messages/${activeChannel}`);
             if (res.ok) {
                 const data = await res.json();
                 setMessages(data);
@@ -174,18 +174,6 @@ const Community = () => {
         scrollToBottom();
     }, [messages]);
 
-    const handleJoin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (nameInput.trim().length > 2) {
-            const newUser = {
-                id: "user_" + Math.random().toString(36).substr(2, 9),
-                name: nameInput.trim(),
-                username: nameInput.trim().toLowerCase().replace(/\s+/g, '_')
-            };
-            localStorage.setItem("user", JSON.stringify(newUser));
-            setCurrentUser(newUser);
-        }
-    };
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -196,7 +184,7 @@ const Community = () => {
             const formData = new FormData();
             formData.append("file", selectedFile);
             try {
-                const res = await fetch("http://127.0.0.1:8000/api/community/upload", {
+                const res = await fetch(`${API_BASE}/community/upload`, {
                     method: "POST",
                     body: formData
                 });
@@ -218,7 +206,7 @@ const Community = () => {
     const handleDeleteMessage = async (msgId: string) => {
         if (!currentUser) return;
         try {
-            await fetch(`http://127.0.0.1:8000/api/community/messages/${msgId}?user_id=${currentUser.id}`, { method: 'DELETE' });
+            await fetch(`${API_BASE}/community/messages/${msgId}?user_id=${currentUser.id}`, { method: 'DELETE' });
         } catch (e) { console.error(e); }
     };
 
@@ -226,7 +214,7 @@ const Community = () => {
         e.preventDefault();
         if (!currentUser || !editingMsgId || !editContent.trim()) return;
         try {
-            await fetch(`http://127.0.0.1:8000/api/community/messages/${editingMsgId}`, {
+            await fetch(`${API_BASE}/community/messages/${editingMsgId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: editContent, user_id: currentUser.id })
@@ -241,7 +229,7 @@ const Community = () => {
         if (newServerName.trim()) {
             const initials = newServerName.substring(0, 2).toUpperCase();
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/community/servers`, {
+                const res = await fetch(`${API_BASE}/community/servers`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: newServerName.trim(), initials })
@@ -261,7 +249,7 @@ const Community = () => {
         e.preventDefault();
         if (newChannelName.trim() && activeServer) {
             try {
-                const res = await fetch(`http://127.0.0.1:8000/api/community/channels`, {
+                const res = await fetch(`${API_BASE}/community/channels`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name: newChannelName.trim().replace(/\s+/g, '-').toLowerCase(), server_id: activeServer })
@@ -280,43 +268,20 @@ const Community = () => {
     const handleUpdateProfile = (updatedProps: any) => {
         if (currentUser) {
             const updated = { ...currentUser, ...updatedProps };
-            localStorage.setItem("user", JSON.stringify(updated));
             setCurrentUser(updated);
+            // Sync with auth storage
+            localStorage.setItem("cortex_user", JSON.stringify(updated));
+            localStorage.setItem("user", JSON.stringify(updated));
         }
     };
 
     const handleLogout = () => {
-        localStorage.removeItem("user");
+        clearSession();
         setCurrentUser(null);
         setShowSettingsModal(false);
+        window.location.href = '/';
     };
 
-    if (!currentUser) {
-        return (
-            <div className="community-layout" style={{ justifyContent: 'center', alignItems: 'center' }}>
-                <div className="glass-card" style={{ width: '100%', maxWidth: '400px', textAlign: 'center', background: '#313338' }}>
-                    <h2 style={{ marginBottom: '1rem', color: '#f2f3f5' }}>Welcome back!</h2>
-                    <p style={{ color: '#b5bac1', marginBottom: '2rem' }}>We're so excited to see you again!</p>
-                    <form onSubmit={handleJoin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', textAlign: 'left' }}>
-                        <label style={{color: '#b5bac1', fontSize: '12px', fontWeight: 'bold'}}>DISPLAY NAME <span style={{color: '#f23f43'}}>*</span></label>
-                        <input 
-                            type="text" 
-                            value={nameInput}
-                            onChange={(e) => setNameInput(e.target.value)}
-                            style={{ 
-                                padding: '10px 12px', background: '#1e1f22', border: 'none', 
-                                borderRadius: '4px', color: '#dbdee1', fontSize: '1rem', outline: 'none'
-                            }}
-                            autoFocus
-                        />
-                        <button type="submit" className="ds-btn-primary" style={{width: '100%'}} disabled={nameInput.trim().length < 3}>
-                            Continue
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="community-layout relative">

@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_BASE = "http://127.0.0.1:8000/api";
+import { API_BASE } from "../api.config";
+
 
 type Flashcard = {
   question: string;
