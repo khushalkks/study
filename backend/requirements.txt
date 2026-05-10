@@ -9,7 +9,5 @@ pymupdf
 PyPDF2
 python-docx
 pydantic
-bson
-asyncio
 python-jose[cryptography]
 passlib[bcrypt]
