@@ -38,6 +38,7 @@ export default function ChatbotPage() {
   const [uploading, setUploading] = useState(false);
   const [sources, setSources] = useState<any[]>([]);
   const [activeSourceIds, setActiveSourceIds] = useState(new Set<string>());
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -137,6 +138,26 @@ export default function ChatbotPage() {
                 ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
                 ::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
                 textarea { resize: none; outline: none; transition: border-color 0.2s; }
+                @media (max-width: 768px) {
+                  nav { padding: 12px 20px !important; }
+                  aside { 
+                    position: absolute !important; 
+                    left: 0; top: 0; bottom: 0; 
+                    z-index: 50; 
+                    transform: translateX(${isSidebarOpen ? '0' : '-100%'});
+                    transition: transform 0.3s ease;
+                    background: #FFF !important;
+                    width: 280px !important;
+                  }
+                  main { padding: 0 !important; }
+                  .chat-content { padding: 20px !important; }
+                  .entry-bar { padding: 12px 20px 20px !important; }
+                  .nav-exit-btn span { display: none !important; }
+                  .mobile-sidebar-toggle { display: flex !important; }
+                }
+                @media (min-width: 769px) {
+                  .mobile-sidebar-toggle { display: none !important; }
+                }
             `}</style>
 
       {/* Soothing Background Aesthetics */}
@@ -166,11 +187,12 @@ export default function ChatbotPage() {
         </div>
         <button
           onClick={() => navigate("/dashboard")}
+          className="nav-exit-btn"
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', background: '#FFF', border: '1px solid #E5E7EB', borderRadius: 100, color: '#4B5563', fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', transition: '0.2s' }}
           onMouseOver={e => { e.currentTarget.style.background = '#F9FAFB'; e.currentTarget.style.borderColor = '#4F46E5'; e.currentTarget.style.color = '#4F46E5'; }}
           onMouseOut={e => { e.currentTarget.style.background = '#FFF'; e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#4B5563'; }}
         >
-          <ChevronLeft size={18} /> Exit
+          <ChevronLeft size={18} /> <span>Exit</span>
         </button>
       </nav>
 
@@ -263,8 +285,13 @@ export default function ChatbotPage() {
 
         {/* Chat Main Area */}
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div className="mobile-sidebar-toggle" 
+               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+               style={{ padding: '8px 20px', background: 'rgba(255,255,255,0.5)', borderBottom: '1px solid #E5E7EB', display: 'none', alignItems: 'center', gap: 10, cursor: 'pointer', color: '#4F46E5', fontWeight: 700, fontSize: '0.85rem' }}>
+            <LayoutGrid size={18} /> {isSidebarOpen ? 'Close Sources' : 'View Sources'}
+          </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '40px 60px' }}>
+          <div className="chat-content" style={{ flex: 1, overflowY: 'auto', padding: '40px 60px' }}>
             <div style={{ maxWidth: '800px', margin: '0 auto' }}>
               {messages.map((msg, i) => (
                 <motion.div
@@ -330,7 +357,7 @@ export default function ChatbotPage() {
           </div>
 
           {/* Entry Bar */}
-          <div style={{ padding: '24px 60px 40px', background: 'transparent' }}>
+          <div className="entry-bar" style={{ padding: '24px 60px 40px', background: 'transparent' }}>
             <div style={{ maxWidth: '800px', margin: '0 auto', position: 'relative' }}>
 
               {activeSourceIds.size > 0 && (

@@ -725,3 +725,81 @@
 .ds-link:hover {
   text-decoration: underline;
 }
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .servers-sidebar {
+    width: 60px;
+    padding-top: 8px;
+  }
+  .server-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .channels-sidebar {
+    position: absolute;
+    left: 60px;
+    top: 0;
+    bottom: 0;
+    width: 200px;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  .channels-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 4px 0 15px rgba(0,0,0,0.3);
+  }
+  .members-sidebar {
+    display: none;
+  }
+  .header-right .search-bar,
+  .header-right .header-icon:not(.mobile-toggle) {
+    display: none;
+  }
+  .chat-header {
+    padding: 0 12px;
+  }
+  .chat-messages {
+    padding: 12px;
+  }
+  .message-item {
+    gap: 12px;
+    padding: 2px 8px;
+  }
+  .message-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  .glass-card {
+    width: 90%;
+    margin: 20px;
+  }
+  .chat-input-container {
+    padding: 0 12px 12px;
+  }
+  .ds-sidebar {
+    display: none;
+  }
+  .ds-main {
+    width: 100%;
+  }
+  .ds-main-content {
+    width: 100%;
+    padding: 20px;
+  }
+  .mobile-toggle {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-right: 8px;
+    color: #dbdee1;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-toggle {
+    display: none !important;
+  }
+}

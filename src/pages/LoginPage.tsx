@@ -33,7 +33,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ 
+    <div className="login-root" style={{ 
       minHeight: '100vh', 
       background: '#020617', 
       display: 'flex', 
@@ -43,7 +43,7 @@ export default function LoginPage() {
     }}>
       
       {/* Left Side: Visual Experience */}
-      <div style={{ 
+      <div className="login-visual" style={{ 
         flex: 1.2, 
         position: 'relative', 
         display: 'flex', 
@@ -113,7 +113,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side: Login Form */}
-      <div style={{ 
+      <div className="login-form-container" style={{ 
         flex: 0.8, 
         background: '#0a0f1e', 
         display: 'flex', 
@@ -126,6 +126,7 @@ export default function LoginPage() {
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
+          className="login-form-wrapper"
           style={{ width: '100%', maxWidth: '400px' }}
         >
           <div style={{ marginBottom: '48px', textAlign: 'center' }}>
@@ -240,6 +241,13 @@ export default function LoginPage() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         input:focus { border-color: #4f46e5 !important; background: rgba(255,255,255,0.05) !important; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+        
+        @media (max-width: 900px) {
+          .login-root { flex-direction: column !important; overflow-y: auto !important; }
+          .login-visual { display: none !important; }
+          .login-form-container { flex: 1 !important; padding: 60px 20px !important; border-left: none !important; }
+          .login-form-wrapper { max-width: 100% !important; }
+        }
       `}</style>
     </div>
   );

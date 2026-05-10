@@ -80,10 +80,21 @@ const Dashboard = () => {
         .icon-container:hover { transform: scale(1.1) rotate(5deg); }
         
         @media (max-width: 900px) {
-          .feature-row { grid-template-columns: 1fr; gap: 40px; }
+          .nav { padding: 12px 20px !important; }
+          .nav-links { gap: 12px !important; }
+          .nav-home-btn { display: none !important; }
+          .header-section { padding: 60px 20px !important; margin-bottom: 60px !important; }
+          .feature-row { grid-template-columns: 1fr !important; gap: 40px !important; margin-bottom: 80px !important; }
           .side-info { text-align: left !important; }
-          .svg-path-desktop { display: none; }
-          .icon-container { margin-left: 0 !important; margin-right: auto !important; }
+          .svg-path-desktop { display: none !important; }
+          .icon-container { margin-left: 0 !important; margin-right: auto !important; width: 60px !important; height: 60px !important; border-radius: 18px !important; }
+          .icon-container svg { width: 20px !important; height: 20px !important; }
+          .roadmap-container { padding: 40px 20px 100px !important; }
+          .feature-title { font-size: 1.8rem !important; }
+          .feature-desc { max-width: 100% !important; font-size: 1rem !important; }
+          .launch-btn { width: 100% !important; justify-content: center !important; }
+          .user-pill { padding: 4px 4px 4px 12px !important; }
+          .user-name { display: none !important; }
         }
       `}</style>
 
@@ -99,16 +110,16 @@ const Dashboard = () => {
         top: 0,
         zIndex: 100,
         borderBottom: '1px solid rgba(0,0,0,0.05)'
-      }}>
+      }} className="nav">
         <div style={{ fontWeight: 800, fontSize: '1.25rem', color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => navigate("/home")}>
           <div style={{ background: '#4F46E5', color: '#fff', width: 32, height: 32, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Layout size={18} /></div>
           Cortex Roadmap
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+        <div className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
           {user && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', padding: '6px 6px 6px 16px', borderRadius: '100px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>{user?.name || 'User'}</div>
+            <div className="user-pill" style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#fff', padding: '6px 6px 6px 16px', borderRadius: '100px', border: '1px solid #e2e8f0' }}>
+              <div className="user-name" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e293b' }}>{user?.name || 'User'}</div>
               <img src={user.avatar} style={{ width: 28, height: 28, borderRadius: '50%' }} />
               <button
                 onClick={handleLogout}
@@ -122,6 +133,7 @@ const Dashboard = () => {
           )}
           <button
             onClick={() => navigate("/home")}
+            className="nav-home-btn"
             style={{ background: '#fff', border: '1px solid #e2e8f0', padding: '8px 20px', borderRadius: '12px', fontSize: '14px', fontWeight: 700, color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
           >
             <ArrowLeft size={16} /> Home
@@ -129,7 +141,7 @@ const Dashboard = () => {
         </div>
       </nav>
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '80px 40px' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '80px 40px' }} className="header-section">
         <header style={{ textAlign: 'center', marginBottom: '120px' }}>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#e0e7ff', color: '#4338ca', padding: '6px 16px', borderRadius: '100px', fontWeight: 700, fontSize: '0.85rem', marginBottom: 24 }}>
             <Sparkles size={16} /> Welcome back, {user?.name?.split(' ')[0] || 'Scholar'}
@@ -176,9 +188,9 @@ const Dashboard = () => {
                 <div style={{ textAlign: isLeft ? 'right' : 'left' }} className="side-info">
                   {isLeft ? (
                     <>
-                      <h3 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>{f.title}</h3>
+                      <h3 className="feature-title" style={{ fontSize: '2.2rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>{f.title}</h3>
                       <p style={{ color: f.color, fontWeight: 700, fontSize: '0.95rem', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '1px' }}>{f.tagline}</p>
-                      <p style={{ color: '#64748b', fontSize: '1.1rem', lineHeight: 1.6, maxWidth: '400px', marginLeft: 'auto' }}>{f.desc}</p>
+                      <p className="feature-desc" style={{ color: '#64748b', fontSize: '1.1rem', lineHeight: 1.6, maxWidth: '400px', marginLeft: 'auto' }}>{f.desc}</p>
                     </>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'flex-start' }}>
@@ -201,9 +213,9 @@ const Dashboard = () => {
                 <div style={{ textAlign: isLeft ? 'left' : 'right' }} className="side-info">
                   {!isLeft ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <h3 style={{ fontSize: '2.2rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>{f.title}</h3>
+                      <h3 className="feature-title" style={{ fontSize: '2.2rem', fontWeight: 800, color: '#0f172a', marginBottom: '8px' }}>{f.title}</h3>
                       <p style={{ color: f.color, fontWeight: 700, fontSize: '0.95rem', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '1px' }}>{f.tagline}</p>
-                      <p style={{ color: '#64748b', fontSize: '1.1rem', lineHeight: 1.6, maxWidth: '400px' }}>{f.desc}</p>
+                      <p className="feature-desc" style={{ color: '#64748b', fontSize: '1.1rem', lineHeight: 1.6, maxWidth: '400px' }}>{f.desc}</p>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', alignItems: 'flex-end' }}>

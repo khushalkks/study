@@ -92,6 +92,25 @@ const Home = () => {
           box-shadow: 0 20px 50px rgba(0,0,0,0.08); border: 4px solid #fff;
         }
 
+        @media (max-width: 768px) {
+          .nav { padding: 12px 20px; }
+          .nav-links { display: none !important; }
+          .hero-title { font-size: 2.5rem; }
+          .hero-subtitle { font-size: 1.1rem !important; }
+          .hero-section { padding: 80px 20px 120px !important; }
+          .feature-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+          .feature-item { text-align: center !important; }
+          .feature-item img { height: 240px !important; }
+          .feature-item-content { text-align: center !important; }
+          .feature-item-icon { margin: 0 auto 20px !important; }
+          .footer-content { padding: 0 20px !important; gap: 40px !important; }
+          .footer-links { gap: 40px !important; }
+          .roadmap-line { display: none !important; }
+          .roadmap-dot { display: none !important; }
+          .hero-search-bar { padding: 8px 8px 8px 24px !important; }
+          .hero-search-bar div { font-size: 1rem !important; }
+        }
+        
         @media (max-width: 1100px) {
           .hero-bubbles { display: none !important; }
         }
@@ -104,7 +123,7 @@ const Home = () => {
           CortexCraft
         </div>
 
-        <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
+        <div className="nav-links" style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
           <button style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }} onClick={() => navigate("/community")}>Community</button>
 
           <AnimatePresence mode="wait">
@@ -139,7 +158,7 @@ const Home = () => {
         </div>
       </nav>
 
-      <section style={{ position: 'relative', padding: '120px 40px 180px', textAlign: 'center' }}>
+      <section className="hero-section" style={{ position: 'relative', padding: '120px 40px 180px', textAlign: 'center' }}>
         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)', backgroundSize: '32px 32px', opacity: 0.4, zIndex: 0 }}></div>
 
         <div className="hero-bubbles" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
@@ -165,10 +184,11 @@ const Home = () => {
             <Sparkles size={16} /> Active Mentor Ready
           </motion.div>
           <h1 className="hero-title">Stop pulling your hair out.<br />Your 'Aha!' moment is one tap away.</h1>
-          <p style={{ fontSize: '1.3rem', color: '#64748b', marginBottom: 56, fontFamily: 'Lora', maxWidth: 600, margin: '0 auto 56px', lineHeight: 1.6 }}>Don't just stare at your notes like they're in a foreign language. Understand the 'why' without the 2 AM mental breakdown.</p>
+          <p className="hero-subtitle" style={{ fontSize: '1.3rem', color: '#64748b', marginBottom: 56, fontFamily: 'Lora', maxWidth: 600, margin: '0 auto 56px', lineHeight: 1.6 }}>Don't just stare at your notes like they're in a foreign language. Understand the 'why' without the 2 AM mental breakdown.</p>
 
           <motion.div
             whileHover={{ scale: 1.02, boxShadow: '0 30px 60px rgba(0,0,0,0.06)' }}
+            className="hero-search-bar"
             style={{ background: '#fff', border: '2px solid #e2e8f0', borderRadius: '100px', padding: '12px 12px 12px 36px', display: 'flex', alignItems: 'center', gap: 16, maxWidth: 680, margin: '0 auto', boxShadow: '0 20px 40px rgba(0,0,0,0.04)', transition: '0.4s' }}
           >
             <div style={{ fontSize: '1.15rem', color: '#94a3b8', flex: 1, textAlign: 'left', fontFamily: 'Lora' }}>What topic do you want to master today?</div>
@@ -179,48 +199,48 @@ const Home = () => {
         </div>
       </section>
 
-      <section style={{ padding: '140px 60px', background: '#fff', position: 'relative', zIndex: 1 }}>
+      <section className="feature-section" style={{ padding: '140px 60px', background: '#fff', position: 'relative', zIndex: 1 }}>
         <div style={{ textAlign: 'center', marginBottom: 120 }}>
           <h2 style={{ fontSize: '3rem', fontWeight: 800, color: '#0f172a', marginBottom: 20 }}>The Learning Flowchart.</h2>
           <p style={{ color: '#64748b', fontSize: '1.25rem', fontFamily: 'Lora', maxWidth: 600, margin: '0 auto' }}>A structured path designed to ensure maximum knowledge retention.</p>
         </div>
 
         <div style={{ maxWidth: 1050, margin: '0 auto', position: 'relative' }}>
-          <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, borderLeft: '3px dashed #e2e8f0', transform: 'translateX(-50%)', zIndex: 0 }}></div>
+          <div className="roadmap-line" style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 2, borderLeft: '3px dashed #e2e8f0', transform: 'translateX(-50%)', zIndex: 0 }}></div>
 
-          <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 100, alignItems: 'center', marginBottom: 160, position: 'relative' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ background: '#EEF2FF', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, marginLeft: 'auto', color: '#4F46E5', boxShadow: '0 10px 20px rgba(79, 70, 229, 0.1)' }}><BrainCircuit size={32} /></div>
+          <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 100, alignItems: 'center', marginBottom: 160, position: 'relative' }}>
+            <div className="feature-item-content" style={{ textAlign: 'right' }}>
+              <div className="feature-item-icon" style={{ background: '#EEF2FF', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, marginLeft: 'auto', color: '#4F46E5', boxShadow: '0 10px 20px rgba(79, 70, 229, 0.1)' }}><BrainCircuit size={32} /></div>
               <h3 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: 20, color: '#0f172a' }}>Personal AI Mentor</h3>
               <p style={{ color: '#64748b', lineHeight: 1.8, fontSize: '1.15rem' }}>Stop getting stuck. Our Socratic AI guides you through complex problems by asking the right questions, helping you build genuine expertise.</p>
             </div>
-            <div style={{ position: 'relative' }}>
+            <div className="feature-item" style={{ position: 'relative' }}>
               <img src="https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&q=80&w=1200" alt="Mentor" className="roadmap-img" />
-              <div style={{ position: 'absolute', top: '50%', left: -56, width: 14, height: 14, borderRadius: '50%', background: '#4F46E5', border: '4px solid #fff', boxShadow: '0 0 0 6px #EEF2FF' }} />
+              <div className="roadmap-dot" style={{ position: 'absolute', top: '50%', left: -56, width: 14, height: 14, borderRadius: '50%', background: '#4F46E5', border: '4px solid #fff', boxShadow: '0 0 0 6px #EEF2FF' }} />
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 100, alignItems: 'center', marginBottom: 160, position: 'relative' }}>
-            <div style={{ position: 'relative' }}>
+          <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 100, alignItems: 'center', marginBottom: 160, position: 'relative' }}>
+            <div className="feature-item" style={{ position: 'relative' }}>
               <img src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=1200" alt="Syllabus" className="roadmap-img" />
-              <div style={{ position: 'absolute', top: '50%', right: -56, width: 14, height: 14, borderRadius: '50%', background: '#EF4444', border: '4px solid #fff', boxShadow: '0 0 0 6px #FEF2F2' }} />
+              <div className="roadmap-dot" style={{ position: 'absolute', top: '50%', right: -56, width: 14, height: 14, borderRadius: '50%', background: '#EF4444', border: '4px solid #fff', boxShadow: '0 0 0 6px #FEF2F2' }} />
             </div>
-            <div style={{ textAlign: 'left' }}>
-              <div style={{ background: '#FEF2F2', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, color: '#EF4444', boxShadow: '0 10px 20px rgba(239, 68, 68, 0.1)' }}><BookOpen size={32} /></div>
+            <div className="feature-item-content" style={{ textAlign: 'left' }}>
+              <div className="feature-item-icon" style={{ background: '#FEF2F2', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, color: '#EF4444', boxShadow: '0 10px 20px rgba(239, 68, 68, 0.1)' }}><BookOpen size={32} /></div>
               <h3 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: 20, color: '#0f172a' }}>Structured Roadmap</h3>
               <p style={{ color: '#64748b', lineHeight: 1.8, fontSize: '1.15rem' }}>Never lose your way. We organize your learning into a clear path of chapters, quizzes, and notes, optimized for your personal pace.</p>
             </div>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 100, alignItems: 'center', position: 'relative' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ background: '#FEF3C7', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, marginLeft: 'auto', color: '#D97706', boxShadow: '0 10px 20px rgba(217, 119, 6, 0.1)' }}><Users size={32} /></div>
+          <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="feature-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 100, alignItems: 'center', position: 'relative' }}>
+            <div className="feature-item-content" style={{ textAlign: 'right' }}>
+              <div className="feature-item-icon" style={{ background: '#FEF3C7', width: 64, height: 64, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24, marginLeft: 'auto', color: '#D97706', boxShadow: '0 10px 20px rgba(217, 119, 6, 0.1)' }}><Users size={32} /></div>
               <h3 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: 20, color: '#0f172a' }}>Collaborative IDE</h3>
               <p style={{ color: '#64748b', lineHeight: 1.8, fontSize: '1.15rem' }}>Learn together in real-time. Join community channels, code with peers in our live IDE, and share insights in a safe, academic environment.</p>
             </div>
-            <div style={{ position: 'relative' }}>
+            <div className="feature-item" style={{ position: 'relative' }}>
               <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200" alt="Community" className="roadmap-img" />
-              <div style={{ position: 'absolute', top: '50%', left: -56, width: 14, height: 14, borderRadius: '50%', background: '#D97706', border: '4px solid #fff', boxShadow: '0 0 0 6px #FEF3C7' }} />
+              <div className="roadmap-dot" style={{ position: 'absolute', top: '50%', left: -56, width: 14, height: 14, borderRadius: '50%', background: '#D97706', border: '4px solid #fff', boxShadow: '0 0 0 6px #FEF3C7' }} />
             </div>
           </motion.div>
         </div>
@@ -228,7 +248,7 @@ const Home = () => {
 
       {/* COMPACT FOOTER */}
       <footer style={{ background: '#0f172a', padding: '60px 0 30px', color: '#94a3b8' }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 60px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 60 }}>
+        <div className="footer-content" style={{ maxWidth: 1200, margin: '0 auto', padding: '0 60px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 60 }}>
           <div>
             <div style={{ color: '#fff', fontWeight: 800, fontSize: '1.4rem', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ background: '#6366f1', color: '#fff', width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><GraduationCap size={20} /></div>
@@ -236,7 +256,7 @@ const Home = () => {
             </div>
             <p style={{ maxWidth: 300, lineHeight: 1.6, fontSize: '0.95rem' }}>The future of education is agentic. We provide the tools to master any subject through Socratic AI guidance.</p>
           </div>
-          <div style={{ display: 'flex', gap: 80 }}>
+          <div className="footer-links" style={{ display: 'flex', gap: 80 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <span style={{ color: '#fff', fontWeight: 700, fontSize: '1rem', marginBottom: 6 }}>Product</span>
               <a href="#" style={{ color: 'inherit', textDecoration: 'none', transition: '0.2s', fontSize: '0.9rem' }}>Dashboard</a>

@@ -28,6 +28,7 @@ export default function SummaryPage() {
   const [history, setHistory] = useState<SummaryEntry[]>([]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragging(true); }, []);
   const onDragLeave = useCallback(() => setDragging(false), []);
@@ -229,25 +230,54 @@ export default function SummaryPage() {
         
         .sp-hint{margin-top:20px;padding:14px 18px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:14px;font-size:0.8rem;color:#6B7280;line-height:1.6;}
         .sp-hint code{color:var(--vivid);background:#EEF2FF;padding:2px 6px;border-radius:6px;font-family:monospace;font-weight:600;}
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+          .sp-nav { padding: 12px 20px; }
+          .sp-nav-center { display: none !important; }
+          .sp-sidebar { 
+            position: absolute; 
+            left: 0; top: 0; bottom: 0; 
+            width: 280px; 
+            z-index: 50; 
+            transform: translateX(-100%); 
+            transition: transform 0.3s ease;
+          }
+          .sp-sidebar.open { transform: translateX(0); box-shadow: 4px 0 15px rgba(0,0,0,0.2); }
+          .sp-main-inner { padding: 24px 20px; }
+          .sp-two-col { grid-template-columns: 1fr; gap: 32px; }
+          .sp-summary-body { max-height: none; }
+          .mobile-history-toggle { display: flex !important; }
+        }
+        @media (min-width: 769px) {
+          .mobile-history-toggle { display: none !important; }
+        }
       `}</style>
 
       <div className="sp-root">
         {/* Nav */}
         <nav className="sp-nav">
-          <div className="sp-logo" onClick={() => navigate("/")}>
-            <div className="sp-logo-dot" />
-            CortexCraft
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button className="mobile-history-toggle" 
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    style={{ background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: 10, padding: 8, color: '#4F46E5', cursor: 'pointer', display: 'none', alignItems: 'center', justifyContent: 'center' }}>
+              <Archive size={20} />
+            </button>
+            <div className="sp-logo" onClick={() => navigate("/")}>
+              <div className="sp-logo-dot" />
+              CortexCraft
+            </div>
           </div>
           <div className="sp-nav-center">
             <FileText size={18} color="#4F46E5" /> Smart Summary
             {/* <span className="sp-nav-badge">FastAPI</span> */}
           </div>
-          <button className="sp-back" onClick={() => navigate("/dashboard")}>← Dashboard</button>
+          <button className="sp-back" onClick={() => navigate("/dashboard")}><span>← Dashboard</span></button>
         </nav>
 
         <div className="sp-body">
           {/* Sidebar */}
-          <aside className="sp-sidebar">
+          <aside className={`sp-sidebar ${isSidebarOpen ? 'open' : ''}`}>
             <div className="sp-sidebar-head">
               <div className="sp-sidebar-title">
                 History <span className="sp-sidebar-count">{history.length}</span>
@@ -263,7 +293,7 @@ export default function SummaryPage() {
                 <div
                   key={item.id}
                   className={`sp-hist-item ${selectedIdx === idx ? "active" : ""}`}
-                  onClick={() => setSelectedIdx(idx)}
+                  onClick={() => { setSelectedIdx(idx); setIsSidebarOpen(false); }}
                 >
                   <div className="sp-hist-icon-row">
                     <span>{item.fileName.endsWith(".pdf") ? <FileIcon size={14} color="#6366F1" /> : item.fileName.match(/\.(png|jpg|jpeg|webp)$/i) ? <ImageIcon size={14} color="#6366F1" /> : <FileText size={14} color="#6366F1" />}</span>

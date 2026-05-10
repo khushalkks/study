@@ -58,6 +58,7 @@ const Community = () => {
     const [showChannelModal, setShowChannelModal] = useState(false);
     const [newChannelName, setNewChannelName] = useState("");
     const [showSettingsModal, setShowSettingsModal] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     // Edit message state
     const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
@@ -343,7 +344,7 @@ const Community = () => {
             </div>
 
             {/* Channels Sidebar */}
-            <div className="channels-sidebar">
+            <div className={`channels-sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
                 <div className="channels-header" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
                     <h2>{servers.find(s => s.id === activeServer)?.name || "Community"}</h2>
                 </div>
@@ -359,6 +360,7 @@ const Community = () => {
                             onClick={() => {
                                 setMessages([]); 
                                 setActiveChannel(channel.id);
+                                setIsMobileMenuOpen(false);
                             }}
                         >
                             <Hash size={18} style={{opacity: 0.6}} />
@@ -385,7 +387,10 @@ const Community = () => {
             <div className="chat-area">
                 <div className="chat-header">
                     <div className="header-left">
-                        <Hash size={24} className="header-icon" />
+                        <div className="mobile-toggle" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+                            <Hash size={24} />
+                        </div>
+                        <Hash size={24} className="header-icon" style={{ display: 'none' }} />
                         <h2>{channels.find(c => c.id === activeChannel)?.name || "Select a channel"}</h2>
                     </div>
                     <div className="header-right">

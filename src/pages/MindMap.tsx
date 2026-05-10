@@ -95,6 +95,7 @@ function StepTracker({ step }: { step: Step }) {
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return (
     <div
+      className="card"
       style={{
         background: "#ffffff",
         border: "1px solid #e2e8f0",
@@ -271,6 +272,22 @@ export default function MindMapGenerator() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes toastIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        @media (max-width: 768px) {
+          .nav { padding: 12px 20px !important; }
+          .nav-logo { font-size: 1rem !important; }
+          .nav-dash-btn { padding: 6px 12px !important; font-size: 12px !important; }
+          .nav-dash-btn span { display: none !important; }
+          .header-section { margin-bottom: 40px !important; padding: 0 20px !important; }
+          .header-title { font-size: 1.8rem !important; }
+          .header-subtitle { font-size: 1rem !important; }
+          .step-tracker { display: none !important; }
+          .card { padding: 24px !important; border-radius: 16px !important; }
+          .mermaid-container { padding: 16px !important; min-height: 300px !important; }
+          .mermaid-container svg { width: 100% !important; height: auto !important; }
+          .action-buttons { flex-direction: column !important; }
+          .action-buttons button { width: 100% !important; }
+          .toast { right: 20px !important; left: 20px !important; bottom: 20px !important; max-width: none !important; }
+        }
       `}</style>
 
       {/* Nav */}
@@ -280,34 +297,37 @@ export default function MindMapGenerator() {
         backdropFilter: 'blur(16px)', position: 'sticky', top: 0, zIndex: 100,
         borderBottom: '1px solid #e2e8f0'
       }}>
-        <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => navigate("/")}>
+        <div className="nav-logo" style={{ fontWeight: 800, fontSize: '1.2rem', color: '#4F46E5', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => navigate("/")}>
           ⬡ Cortex MindMap
         </div>
         <button
           onClick={() => navigate("/dashboard")}
+          className="nav-dash-btn"
           style={{ background: 'none', border: '1px solid #e2e8f0', padding: '8px 18px', borderRadius: '10px', fontSize: '14px', fontWeight: 600, color: '#64748b', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
         >
-          <ArrowLeft size={16} /> Dashboard
+          <ArrowLeft size={16} /> <span>Dashboard</span>
         </button>
       </nav>
 
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "60px 24px 120px" }}>
 
         {/* Header */}
-        <header style={{ textAlign: "center", marginBottom: 60 }}>
+        <header className="header-section" style={{ textAlign: "center", marginBottom: 60 }}>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#e0e7ff', color: '#4338ca', padding: '6px 16px', borderRadius: '100px', fontWeight: 700, fontSize: '0.8rem', marginBottom: 20 }}>
             <Sparkles size={14} /> AI Visualization
           </motion.div>
-          <h1 style={{ fontSize: "clamp(2rem, 5vw, 2.5rem)", fontWeight: 800, color: "#0f172a", marginBottom: 16 }}>
+          <h1 className="header-title" style={{ fontSize: "clamp(2rem, 5vw, 2.5rem)", fontWeight: 800, color: "#0f172a", marginBottom: 16 }}>
             Turn concepts into<br />
             <span style={{ color: "#4f46e5" }}>Visual Knowledge.</span>
           </h1>
-          <p style={{ color: "#64748b", fontSize: "1.1rem", fontFamily: 'Lora', maxWidth: 500, margin: '0 auto' }}>
+          <p className="header-subtitle" style={{ color: "#64748b", fontSize: "1.1rem", fontFamily: 'Lora', maxWidth: 500, margin: '0 auto' }}>
             Our AI analyzes your documents and builds interactive branching maps to help you master structure.
           </p>
         </header>
 
-        <StepTracker step={step} />
+        <div className="step-tracker">
+          <StepTracker step={step} />
+        </div>
 
         {/* ── STEP 1: Upload ── */}
         {step === 1 && (
@@ -500,6 +520,7 @@ export default function MindMapGenerator() {
             {mermaidSvg && (
               <div
                 ref={mermaidRef}
+                className="mermaid-container"
                 style={{
                   background: "#fff",
                   border: '1px solid #f1f5f9',
@@ -517,7 +538,7 @@ export default function MindMapGenerator() {
               />
             )}
 
-            <div style={{ display: "flex", flexWrap: 'wrap', gap: 12, marginTop: 32 }}>
+            <div className="action-buttons" style={{ display: "flex", flexWrap: 'wrap', gap: 12, marginTop: 32 }}>
               <button
                 onClick={restart}
                 style={{
@@ -550,7 +571,7 @@ export default function MindMapGenerator() {
 
       {/* Toast */}
       {toast && (
-        <div style={{
+        <div className="toast" style={{
           position: "fixed", bottom: 32, right: 32,
           background: "#fff",
           border: `1px solid ${toast.type === "error" ? "#ef4444" : "#4f46e5"}`,
